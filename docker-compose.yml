@@ -10,14 +10,14 @@ services:
       - TEST_MODE=true
       - DB_URL=mongodb://db:27017
       - DATASET_BATCH_LENGTH=200000
-      - QUANTIZE=true           
+      - QUANTIZE=true        
     build:
         context: ./bshp_ml
-        dockerfile: Dockerfile      
+        dockerfile: Dockerfile   
     ports:
       - "8061:8061"
     volumes:
-      - ./models:/models
+      - ./bshp_ml/app:/app
     networks:
       - custom
     depends_on:

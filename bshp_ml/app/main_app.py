@@ -14,12 +14,26 @@ from fastapi import (
     Path,
     Body,
 )
+from fastapi import (
+    FastAPI,
+    APIRouter,
+    Header,
+    HTTPException,
+    BackgroundTasks,
+    File,
+    UploadFile,
+    Depends,
+    Query,
+    Path,
+    Body,
+)
 from fastapi.exceptions import HTTPException
 from cachetools import TTLCache
 import aiohttp
 import traceback
 
 from settings import VERSION, DB_URL, TEST_MODE, AUTH_SERVICE_URL
+from fastapi.responses import HTMLResponse  # FileResponse
 from fastapi.responses import HTMLResponse  # FileResponse
 
 import logging
@@ -38,6 +52,10 @@ from schemas.tasks import (
 from db import db_processor
 from models import model_manager
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
+)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
@@ -63,6 +81,8 @@ async def check_token(token: str = Header()) -> bool:
             async with session.post(
                 f"{AUTH_SERVICE_URL}/check_token",  # type: ignore
                 json={"token": token},
+                f"{AUTH_SERVICE_URL}/check_token",  # type: ignore
+                json={"token": token},
             ) as response:
                 if response.status == 200:
                     auth_cache[token] = True
@@ -72,6 +92,12 @@ async def check_token(token: str = Header()) -> bool:
                 elif response.status == 403:
                     raise HTTPException(status_code=401, detail="Token expired")
                 else:
+                    logger.error(
+                        f"Auth service returned unexpected status {response.status}"
+                    )
+                    raise HTTPException(
+                        status_code=500, detail="Authentication service error"
+                    )
                     logger.error(
                         f"Auth service returned unexpected status {response.status}"
                     )
@@ -102,12 +128,14 @@ async def lifespan(app: FastAPI):
         logger.info("Starting DB connection")
         app.db = db_processor
         logger.info(DB_URL)
+        logger.info(DB_URL)
         await app.db.connect(url=DB_URL)
         await app.db.delete_temp_collections()
         logger.info("DB connection done")
 
     except Exception as e:
         logger.error(f"DB startup error: {e}")
+        raise
         raise
 
     try:
@@ -117,7 +145,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Models initializing error: {e}")
         raise
+        raise
 
+    yield
     yield
 
     try:
@@ -130,7 +160,15 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down prediction service...")
 
+    logger.info("Shutting down prediction service...")
 
+
+app = FastAPI(
+    title="BSHP App",
+    description="Application for AI cash flow parameters predictions!",
+    version=VERSION,
+    lifespan=lifespan,
+)
 app = FastAPI(
     title="BSHP App",
     description="Application for AI cash flow parameters predictions!",
@@ -140,11 +178,13 @@ app = FastAPI(
 
 
 @app.get("/")
+@app.get("/")
 async def main_page():
     """
     Root method returns html ok description
     @return: HTML response with ok micro html
     """
+    return HTMLResponse("<h2>BSHP module</h2> <br> <h3>Connection established</h3>")
     return HTMLResponse("<h2>BSHP module</h2> <br> <h3>Connection established</h3>")
 
 
@@ -197,6 +237,8 @@ async def process_fitting_model(task_id: str):
         if model.status == ModelStatuses.FITTING:
             raise ValueError("Current model is already fitting")
 
+            raise ValueError("Current model is already fitting")
+
         parameters = task.parameters
         if not parameters:
             parameters = {}
@@ -207,7 +249,15 @@ async def process_fitting_model(task_id: str):
         data_filter = (
             {"base_name": task.base_name} if task.base_name != "all_bases" else None
         )
+        if not "data_filter" in parameters:
+            parameters["data_filter"] = {}
+
+        data_filter = (
+            {"base_name": task.base_name} if task.base_name != "all_bases" else None
+        )
         if data_filter:
+            parameters["data_filter"].update(data_filter)
+
             parameters["data_filter"].update(data_filter)
 
         await model.fit(parameters)
@@ -218,6 +268,7 @@ async def process_fitting_model(task_id: str):
         except Exception as e:
             model.status = ModelStatuses.ERROR
             raise e
+        logger.info("Writing model to db. Done")
         logger.info("Writing model to db. Done")
 
         # Update status
@@ -233,15 +284,19 @@ async def process_fitting_model(task_id: str):
 
 
 @app.get("/health")
+@app.get("/health")
 def health() -> str:
+    return "service is working"
     return "service is working"
 
 
+@app.get("/version")
 @app.get("/version")
 def version() -> str:
     return VERSION
 
 
+@app.post("/save_data")
 @app.post("/save_data")
 async def save_data(
     background_tasks: BackgroundTasks,
@@ -260,15 +315,19 @@ async def save_data(
         # Save file
         content = await file.read()
         file_path = await task_manager.save_upload_file(task_id, file.filename, content)  # type: ignore
+        file_path = await task_manager.save_upload_file(task_id, file.filename, content)  # type: ignore
 
         # Update task
         await task_manager.update_task(
             task_id,
             type="UPLOAD",
+            type="UPLOAD",
             status="UPLOADING_FILE",
             upload_progress=100,
             file_path=str(file_path),
             base_name=base_name,
+            replace=replace,
+        )
             replace=replace,
         )
 
@@ -277,6 +336,7 @@ async def save_data(
 
         return TaskResponse(task_id=task_id, message="Task processing started")
 
+
     except Exception as e:
         logger.error(f"Error in uploading task {task_id}: {e}")
 
@@ -284,8 +344,12 @@ async def save_data(
             await task_manager.update_task(
                 task_id, status="ERROR", error="Имя файла слишком длинное"
             )
+            await task_manager.update_task(
+                task_id, status="ERROR", error="Имя файла слишком длинное"
+            )
             raise HTTPException(
                 status_code=500,
+                detail="Имя файла слишком длинное. Сократите имя файла и попробуйте загрузить ещё раз",
                 detail="Имя файла слишком длинное. Сократите имя файла и попробуйте загрузить ещё раз",
             )
         else:
@@ -303,7 +367,9 @@ async def delete_data(
 
     if base_name:
         db_filter = {"base_name": base_name}
+        db_filter = {"base_name": base_name}
     await data_loader.delete_data(db_filter)
+    return "Data has been deleted"
     return "Data has been deleted"
 
 
@@ -324,9 +390,11 @@ async def fit(
     try:
         if not base_name:
             base_name = "all_bases"
+            base_name = "all_bases"
         # Update task
         await task_manager.update_task(
             task_id,
+            type="FIT",
             type="FIT",
             status="PREPARE_FITTING",
             upload_progress=100,
@@ -334,11 +402,14 @@ async def fit(
             base_name=base_name,
             parameters=parameters,
         )
+            parameters=parameters,
+        )
 
         # Start background task
         background_tasks.add_task(process_fitting_model, task_id)
 
         return TaskResponse(task_id=task_id, message="Task processing started")
+
 
     except Exception as e:
         logger.error(f"Error in fitting model: {e}")
@@ -357,10 +428,13 @@ async def delete_model(
     try:
         if not base_name:
             base_name = "all_bases"
+            base_name = "all_bases"
         await model_manager.delete_model(model_type=model_type, base_name=base_name)
+        return "Model has been deleted"
         return "Model has been deleted"
     except Exception as e:
         logger.error(f"Error deleting model: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -377,9 +451,14 @@ async def get_model_info(
         result = await model_manager.get_info(
             model_type=model_type.value, base_name=base_name
         )
+            base_name = "all_bases"
+        result = await model_manager.get_info(
+            model_type=model_type.value, base_name=base_name
+        )
         return ModelInfo.model_validate(result)
     except Exception as e:
         logger.error(f"Error getting model info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -421,6 +500,7 @@ async def predict(
     try:
         if not base_name:
             base_name = "all_bases"
+            base_name = "all_bases"
         X_list = []
         for row in X:
             X_list.append(row.model_dump())
@@ -432,6 +512,7 @@ async def predict(
     except Exception as e:
         print(traceback.format_exc())
         logger.error(f"Error predicting: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
     return result
@@ -446,3 +527,4 @@ async def get_task_status(
     status = await task_manager.get_task_status(task_id)
 
     return status
+

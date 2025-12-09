@@ -1,1 +1,1 @@
-from .embeddings import router
+from .embed import router as embed_router

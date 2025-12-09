@@ -10,6 +10,8 @@ class DataRow(BaseModel):
     Loading, input or output data row
     """
 
+    # TODO: разбить на отдельные pydantic-и
+
     number: str
     date: datetime
     is_reverse: bool
@@ -46,8 +48,8 @@ class DataRow(BaseModel):
     price: float
     sum: float
     cash_flow_item_code: str
-    year: str
     cash_flow_details_code: str
+    year: str
 
     @field_validator("date", mode="before")
     def check_date(cls, value):
@@ -77,6 +79,11 @@ class DataRow(BaseModel):
             result = value
 
         return result
+
+
+class ExtDataRow(DataRow):
+    cash_flow_details_name: str | None = None
+    cash_flow_item_name: str | None = None
 
 
 class ModelStatuses(Enum):

@@ -251,7 +251,6 @@ async def fit(
     try:
         if not base_name:
             base_name = "all_bases"
-            base_name = "all_bases"
         # Update task
         await task_manager.update_task(
             task_id,
@@ -357,7 +356,6 @@ async def predict(
     try:
         if not base_name:
             base_name = "all_bases"
-            base_name = "all_bases"
         X_list = []
         for row in X:
             X_list.append(row.model_dump())
@@ -369,7 +367,6 @@ async def predict(
     except Exception as e:
         print(traceback.format_exc())
         logger.error(f"Error predicting: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
     return result
@@ -384,3 +381,8 @@ async def get_task_status(
     status = await task_manager.get_task_status(task_id)
 
     return status
+
+
+from api import embed_router
+
+app.include_router(embed_router)

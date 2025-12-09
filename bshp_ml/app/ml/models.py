@@ -6,6 +6,7 @@ import pickle
 from datetime import datetime, UTC
 import os
 import uuid
+from fastapi import Query
 import pandas as pd
 import numpy as np
 
@@ -598,6 +599,7 @@ class ModelManager:
         model_dirs = os.listdir(MODEL_FOLDER)
 
         for model_dir in model_dirs:
+            logger.info("Reading models from %s", model_dir)
             if not os.path.isdir(os.path.join(MODEL_FOLDER, model_dir)):
                 continue
 
@@ -605,29 +607,53 @@ class ModelManager:
                 MODEL_FOLDER, model_dir, "parameters.json"
             )
             if not os.path.exists(path_to_parameters):
-                continue
+                if model_dir == "pretrained":
+                    logger.info(
+                        "Reading pretrained models from %s", os.path.abspath(model_dir)
+                    )
 
-            model = None
-            # try:
-            with open(path_to_parameters, "r") as fp:
-                parameters = json.load(fp)
+                    model = None
 
-            model = self._get_new_model(
-                ModelTypes(parameters["model_type"]), parameters["base_name"]
-            )
-            await model.load(parameters["uid"])
+                    model = self._get_new_model(ModelTypes.fstxt)
+                    await model.load(uid=str(uuid.uuid4))
 
-            # except Exception as e:
-            #     pass
+                    if model:
+                        models.append(
+                            {
+                                "model_type": model.model_type,
+                                "base_name": model.base_name,
+                                "model": model,
+                            }
+                        )
+                    else:
+                        logger.warning(
+                            "Model %s wasn`t registred", os.path.abspath(model_dir)
+                        )
 
-            if model:
-                models.append(
-                    {
-                        "model_type": model.model_type,
-                        "base_name": model.base_name,
-                        "model": model,
-                    }
+                else:
+                    continue
+            else:
+                model = None
+                # try:
+                with open(path_to_parameters, "r") as fp:
+                    parameters = json.load(fp)
+
+                model = self._get_new_model(
+                    ModelTypes(parameters["model_type"]), parameters["base_name"]
                 )
+                await model.load(parameters["uid"])
+
+                # except Exception as e:
+                #     pass
+
+                if model:
+                    models.append(
+                        {
+                            "model_type": model.model_type,
+                            "base_name": model.base_name,
+                            "model": model,
+                        }
+                    )
 
         self.models = models
 
@@ -663,7 +689,7 @@ class ModelManager:
             model = self._get_new_model(model_type, base_name)
         return model
 
-    def _get_new_model(self, model_type=ModelTypes.rf, base_name=""):
+    def _get_new_model(self, model_type=ModelTypes.rf, base_name="") -> type[Model]:
         sublasses = self._get_all_model_subclasses()
         model_classes = [
             el for el in sublasses if getattr(el, "model_type") == model_type
@@ -720,3 +746,7 @@ class ModelManager:
             "fitting_end_date": model.fitting_end_date,
             "metrics": model.metrics,
         }
+
+
+def get_model_manager() -> ModelManager:
+    return ModelManager()

@@ -1,18 +1,18 @@
+import json
 import logging
+import os
 
 from sklearn.pipeline import Pipeline
 from .utils import prepare_sentences, preprocess_text
 import numpy as np
 from gensim.models import FastText
-from models import Model
+from ..models import Model
 from ml.data_processing import (
     Checker,
     DataEncoder,
     FeatureAdder,
     NanProcessor,
-    Reader,
     Shuffler,
-    data_loader,
 )
 from schemas.models import ModelStatuses, ModelTypes
 import pandas as pd
@@ -38,7 +38,21 @@ class FastTextModel(Model):
 
     def __init__(self, base_name: str):
         super().__init__(base_name)
-        self.str_columns.append("cash_flow_item_name", "cash_flow_details_name")
+        self.str_columns.extend(["cash_flow_item_name", "cash_flow_details_name"])
+
+    async def load(self, uid):
+        self.uid = uid
+
+        if self.status != ModelStatuses.ERROR:
+            # for y_col in self.y_columns:
+            #     if y_col == "cash_flow_details_code":
+            #         for item in self.classes[y_col]:
+            #             self._load_column_model(y_col, item)
+            #     else:
+            #         self._load_column_model(y_col)
+            # self._load_column_model(y_col)
+
+            self._load_encoder()
 
     def _load_pretrained(self, model_folder=MODEL_FOLDER):
         self._model = FastText.load(f"{model_folder}/pretrained/fsttxt.model")
@@ -146,3 +160,57 @@ class FastTextModel(Model):
 
         df["pred_num"] = df["pred_label"].map({v: k for k, v in det_name_map.items()})
         return res, preprocessed_sentences
+
+    def _save_column_model(self, column, item=None):
+        if not os.path.isdir(os.path.join(MODEL_FOLDER, self.uid, column)):
+            os.makedirs(os.path.join(MODEL_FOLDER, self.uid, column))
+
+        if item is not None:
+            if self.strict_acc.get(column) and self.strict_acc[column].get(item):
+                value = self.strict_acc[column][item]
+                with open(
+                    os.path.join(
+                        MODEL_FOLDER, self.uid, column, "{}.json".format(item)
+                    ),
+                    "w",
+                ) as fp:
+                    json.dump({"value": int(value)}, fp)
+            elif self.field_models.get(column) and self.field_models.get(column).get(
+                str(item)
+            ):
+                self._save_cb_model(self.field_models[column][str(item)], column, item)
+        else:
+            if self.strict_acc.get(column):
+                with open(
+                    os.path.join(MODEL_FOLDER, self.uid, column, "sum.json"), "w"
+                ) as fp:
+                    value = self.strict_acc[column]
+                    json.dump({"value": int(value)}, fp)
+            elif self.field_models.get(column):
+                self._save_cb_model(self.field_models[column], column)
+
+    def _load_column_model(self, column, item=None):
+        if item is not None:
+            if os.path.exists(
+                os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
+            ):
+                if not self.strict_acc.get(column):
+                    self.strict_acc[column] = {}
+                with open(
+                    os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
+                ) as fp:
+                    self.strict_acc[column][item] = np.int64(json.load(fp)["value"])
+            elif os.path.exists(
+                os.path.join(MODEL_FOLDER, self.uid, column, "{}.cbm".format(item))
+            ):
+                self._load_cb_model(column, item)
+        else:
+            if os.path.exists(os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")):
+                with open(
+                    os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")
+                ) as fp:
+                    self.strict_acc[column] = np.int64(json.load(fp)["value"])
+            elif os.path.exists(
+                os.path.join(MODEL_FOLDER, self.uid, column, "sum.cbm")
+            ):
+                self._load_cb_model(column)

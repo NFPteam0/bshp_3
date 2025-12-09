@@ -8,6 +8,7 @@ from datetime import datetime
 import time
 import os
 
+from schemas.models import ModelStatuses
 from settings import SOURCE_FOLDER, TEMP_FOLDER
 from schemas.tasks import TaskData, StatusResponse, ProcessingTaskResponse
 

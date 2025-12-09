@@ -1,44 +1,45 @@
-from abc import ABC, abstractmethod
-import logging
-from typing import Optional
-from enum import Enum
-import pickle
-from datetime import datetime, UTC
-import os
-import uuid
-import pandas as pd
-import numpy as np
-
 import gc
-from .models import Model
-import shutil
-from copy import deepcopy
 import json
+import logging
+import os
+import pickle
 import random
+import shutil
+import uuid
+from abc import ABC, abstractmethod
+from copy import deepcopy
+from datetime import UTC, datetime
+from enum import Enum
+from typing import Optional
+from .utils import get_none_data_row
 
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier
-from catboost import CatBoostClassifier, Pool, sum_models, to_classifier
-
-from data_processing import (
-    Reader,
+import numpy as np
+import pandas as pd
+from ml.data_processing import (
     Checker,
     DataEncoder,
+    FeatureAdder,
     NanProcessor,
     Shuffler,
-    FeatureAdder,
-    data_loader,
 )
-from db import db_processor
-from schemas.tasks import ModelStatuses, ModelTypes
+from schemas.models import ModelStatuses, ModelTypes
 from settings import (
+    DATASET_BATCH_LENGTH,
     MODEL_FOLDER,
+    QUANTIZE,
     THREAD_COUNT,
     USE_DETAILED_LOG,
     USED_RAM_LIMIT,
-    DATASET_BATCH_LENGTH,
-    QUANTIZE,
 )
+from sklearn.pipeline import Pipeline
+
+from catboost import (
+    CatBoostClassifier,
+    Pool,
+    sum_models,
+    to_classifier,
+)
+from ..models import Model
 
 logging.getLogger("bshp_data_processing_logger").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -64,7 +65,6 @@ class CatBoostModel(Model):
         for ind, col in enumerate(self.x_columns):
             if col in self.columns_to_encode:
                 indexes_to_encode.append(ind)
-        t_indexes_to_encode = indexes_to_encode.copy()
 
         for y_col in self.y_columns:
             if USE_DETAILED_LOG:
@@ -280,7 +280,7 @@ class CatBoostModel(Model):
                                 add_dataset = add_dataset.iloc[:50]
                             to_concat.append(add_dataset)
                         else:
-                            none_str = data_loader.get_none_data_row(self.parameters)
+                            none_str = get_none_data_row(self.parameters)
                             none_str[y_column] = val
                             to_concat.append(none_str)
 

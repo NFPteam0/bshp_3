@@ -20,17 +20,16 @@ from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from catboost import CatBoostClassifier, Pool, sum_models, to_classifier
 
-from data_processing import (
-    Reader,
+from ml.data_processing import (
     Checker,
     DataEncoder,
     NanProcessor,
     Shuffler,
     FeatureAdder,
-    data_loader,
 )
+from tasks import Reader
 from db import db_processor
-from schemas.tasks import ModelStatuses, ModelTypes
+from schemas.models import ModelStatuses, ModelTypes
 from settings import (
     MODEL_FOLDER,
     THREAD_COUNT,
@@ -58,6 +57,7 @@ class Model(ABC):
                 ),
             )
         )
+        # TODO: в pydantic
         self.x_columns = [
             "is_reverse",
             "document_month",
@@ -720,6 +720,3 @@ class ModelManager:
             "fitting_end_date": model.fitting_end_date,
             "metrics": model.metrics,
         }
-
-
-model_manager = ModelManager()

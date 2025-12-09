@@ -18,6 +18,7 @@ services:
       - "8061:8061"
     volumes:
       - ./bshp_ml/app:/app
+      - ./models:/models
     networks:
       - custom
     depends_on:

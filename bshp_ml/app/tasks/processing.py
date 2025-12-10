@@ -23,6 +23,7 @@ async def process_uploading_task(
 
         # Execute loading
         result = await data_loader.upload_data_from_file(
+            task_manager,
             task,
         )
 
@@ -90,7 +91,6 @@ async def process_fitting_model(
         except Exception as e:
             model.status = ModelStatuses.ERROR
             raise e
-        logger.info("Writing model to db. Done")
         logger.info("Writing model to db. Done")
 
         # Update status

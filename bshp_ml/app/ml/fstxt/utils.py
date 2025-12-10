@@ -43,7 +43,7 @@ def prepare_sentences(df, txt_cols):
 
 def map_code_to_name():
     pass
-    det_map = {name: num for num, name in enumerate(df[col].unique())}
+    # det_map = {name: num for num, name in enumerate(df[col].unique())}
 
 
 def zero_below_nth_max(df, cols, treshold=0.8, n=10):

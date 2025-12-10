@@ -1,13 +1,12 @@
-from datetime import datetime
 import json
 import os
-from time import timezone
+from datetime import datetime, timezone
 import zipfile
 
 import pandas as pd
 from .manager import TaskManager
 from settings import TEMP_FOLDER, USE_DETAILED_LOG, DB_URL
-from schemas.models import DataRow
+from schemas.models import DataRow, ExtDataRow
 from db import db_processor
 import logging
 
@@ -50,7 +49,7 @@ class DataLoader:
 
         data = []
         for row in json_data:
-            data_row = DataRow.model_validate(row).model_dump()
+            data_row = ExtDataRow.model_validate(row).model_dump()
             data.append(data_row)
 
         pd_data = pd.DataFrame(data)

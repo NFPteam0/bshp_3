@@ -86,6 +86,11 @@ class ExtDataRow(DataRow):
     cash_flow_item_name: str | None = None
 
 
+class EmbedPredictionsRow(BaseModel):
+    pred_label: str
+    pred_prob: float
+
+
 class ModelStatuses(Enum):
     CREATED = "CREATED"
     FITTING = "FITTING"

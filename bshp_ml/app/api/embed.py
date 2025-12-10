@@ -2,8 +2,9 @@ import logging
 import traceback
 import uuid
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
-from schemas.models import DataRow, ExtDataRow, ModelTypes
+from schemas.models import DataRow, ExtDataRow, ModelTypes, EmbedPredictionsRow
 from schemas.tasks import TaskResponse
+from fastapi.encoders import jsonable_encoder
 
 from tasks.processing import process_fitting_model, process_uploading_task
 from tasks.__init__ import task_manager
@@ -21,13 +22,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@router.get("/fit")
+@router.post("/fit")
 async def fit_embeddings(
     background_tasks: BackgroundTasks,
     # token: str = Depends(get_token_from_header),
     # authenticated: bool = Depends(check_token),
     base_name: str = Query(default=""),
     parameters: dict = Body(),
+    model_manager: ModelManager = Depends(get_model_manager),
 ) -> TaskResponse:
     model_type = ModelTypes.fstxt
     task_id = str(uuid.uuid4())
@@ -39,7 +41,6 @@ async def fit_embeddings(
 
     try:
         if not base_name:
-            base_name = "all_bases"
             base_name = "all_bases"
         # Update task
         await task_manager.update_task(
@@ -53,7 +54,9 @@ async def fit_embeddings(
         )
 
         # Start background task
-        background_tasks.add_task(process_fitting_model, task_id)
+        background_tasks.add_task(
+            process_fitting_model, task_manager, model_manager, task_id
+        )
 
         return TaskResponse(task_id=task_id, message="Task processing started")
 
@@ -72,21 +75,24 @@ async def predict_embeddings(
     # authenticated: bool = Depends(check_token),
     model_manager: ModelManager = Depends(get_model_manager),
     # ) -> list[ExtDataRow]:
-):
+) -> list[EmbedPredictionsRow]:
     # пока что без других эмбеддинг моделей
     model_type = ModelTypes.fstxt
     # TODO: depends get_model
     try:
         if not base_name:
             base_name = "all_bases"
-        X_list = []
-        for row in X:
-            X_list.append(row.model_dump())
+        # X_list = []
+        # for row in X:
+        #     X_list.append(row.model_dump())
+
         model = model_manager.get_model(model_type, base_name)
         result = []
-        X_y_list = await model.predict(X_list)
-        for row in X_y_list:
-            result.append(DataRow.model_validate(row))
+        X_y_list = await model.predict(jsonable_encoder(X))
+        result = X_y_list
+        # for row in X_y_list:
+        #     # TODO: можно быстрее?
+        #     result.append(EmbedPredictionsRow.model_validate(row))
     except Exception as e:
         print(traceback.format_exc())
         logger.error(f"Error predicting: {e}")

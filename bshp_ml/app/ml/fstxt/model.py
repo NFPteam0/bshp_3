@@ -14,7 +14,7 @@ from ml.data_processing import (
     NanProcessor,
     Shuffler,
 )
-from schemas.models import ModelStatuses, ModelTypes
+from schemas.models import EmbedPredictionsRow, ModelStatuses, ModelTypes
 import pandas as pd
 from settings import (
     MODEL_FOLDER,
@@ -33,74 +33,96 @@ logger = logging.getLogger(__name__)
 
 class FastTextModel(Model):
     model_type = ModelTypes.fstxt
-    status = None
-    _model: FastText = None
+    _model: FastText | None = None
+    status: ModelStatuses = ModelStatuses.CREATED
+
+    all_classes_names: list | None = None
 
     def __init__(self, base_name: str):
         super().__init__(base_name)
-        self.str_columns.extend(["cash_flow_item_name", "cash_flow_details_name"])
+        self.str_columns.extend(
+            [
+                "cash_flow_item_name",
+                "cash_flow_details_name",
+            ]
+        )
+        self.y_columns = [
+            # "cash_flow_item_name",
+            # "cash_flow_details_name",
+        ]
+        self.need_to_encode = False
 
     async def load(self, uid):
         self.uid = uid
 
         if self.status != ModelStatuses.ERROR:
-            # for y_col in self.y_columns:
-            #     if y_col == "cash_flow_details_code":
-            #         for item in self.classes[y_col]:
-            #             self._load_column_model(y_col, item)
-            #     else:
-            #         self._load_column_model(y_col)
-            # self._load_column_model(y_col)
-
-            self._load_encoder()
+            # TODO: по опции from_pretrained=True?
+            # ИНАЧЕ self._create, но нужно
+            # предобработать, это не здесь
+            self._load_pretrained()
 
     def _load_pretrained(self, model_folder=MODEL_FOLDER):
+        # NOTE: у fasttext есть ивенты из коробки
         self._model = FastText.load(f"{model_folder}/pretrained/fsttxt.model")
 
-    def _fit(self, df: pd.DataFrame, parameters, is_first=True):
-        df[self.str_columns]
+    async def _fit(self, df: pd.DataFrame, parameters, is_first=True):
         if USE_DETAILED_LOG:
             logger.info("{} fit".format("First" if is_first else "continuous"))
 
-        if is_first:
-            self.strict_acc = {}
-            self.test_strict_acc = {}
-        c_x_columns = self.x_columns.copy()
+        # if is_first:
+        #     self.strict_acc = {}
+        #     self.test_strict_acc = {}
+        # c_x_columns = self.x_columns.copy()
 
-        indexes_to_encode = []
-        for ind, col in enumerate(self.x_columns):
-            if col in self.columns_to_encode:
-                indexes_to_encode.append(ind)
-
-    def _get_pipeline(self) -> Pipeline:
-        pipeline_list = []
-        pipeline_list.append(("checker", Checker(self.parameters, for_predict=True)))
-        pipeline_list.append(
-            ("nan_processor", NanProcessor(self.parameters, for_predict=True))
-        )
-        pipeline_list.append(
-            ("feature_addder", FeatureAdder(self.parameters, for_predict=True))
-        )
-        if self.need_to_encode:
-            pipeline_list.append(("data_encoder", self.data_encoder))
-
-        return Pipeline(pipeline_list)
-
-    def fit_continue(self):
+        # indexes_to_encode = []
+        # for ind, col in enumerate(self.x_columns):
+        #     if col in self.columns_to_encode:
+        #         indexes_to_encode.append(ind)
+        X = df[self.str_columns].copy()
+        logger.info("Shape of loaded data: %s", X.shape)
+        # always False until TODO in .load
         if self._model is None:
-            self._load_pretrained()
-        sentences = prepare_sentences(X, self.str_columns)
-        new_sentences = [preprocess_text(" ".join(sent)).split() for sent in sentences]
-        self._model.build_vocab(new_sentences, update=True)
-        self._model.train(
-            new_sentences,
-            total_examples=len(new_sentences),
-            epochs=self._model.epochs,
-        )
+            logger.info("No pretrained model found")
+            # Если нет загруженной, нажали на fit
+            # self._load_pretrained()
+            # _create?
+            ...
+        if is_first or self.all_classes_names is None:
+            logger.info(
+                "Bare pretrained model, copy all_classes_names from df: %d objects",
+                len(df["cash_flow_details_name"].unique()),
+            )
+            self.all_classes_names = set(df["cash_flow_details_name"].unique()) - set(
+                ""
+            )
+            if USE_DETAILED_LOG:
+                logging.info("Overall classes %d", len(self.all_classes_names))
+
+        else:
+            new_sentences = [
+                preprocess_text(" ".join(sent)).split()
+                for sent in prepare_sentences(X, self.str_columns)
+            ]
+
+            logger.info(
+                "Training pretrained model with %d ngrams", self._model.word_ngrams
+            )
+
+            self._model.build_vocab(new_sentences, update=True)
+            self._model.train(
+                new_sentences,
+                total_examples=len(new_sentences),
+                epochs=self._model.epochs,
+            )
+
+    def _get_all_classes(self, df: pd.DataFrame):
+        # TODO: move to fit? no bare prefitted?
+        ...
 
     def _create(self):
+        """fits from scratch"""
         self._model = FastText(
-            sentences=prep_sents,
+            sentences=...,
             vector_size=2**7,
             window=30,
             min_count=1,
@@ -111,106 +133,105 @@ class FastTextModel(Model):
             epochs=15,
         )
 
-    def predict(self, X, for_metrics=False):
-        if not for_metrics and self.status != ModelStatuses.READY:
-            raise ValueError("Model is not ready. Fit it before.")
+    async def predict(
+        self, X_api: dict | list[dict], for_metrics=False
+    ) -> list[EmbedPredictionsRow]:
+        X = pd.DataFrame(X_api)
+        # predict_detail
+        if self.status != ModelStatuses.READY or self.all_classes_names is None:
+            raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 
-        field_models = self.field_models
-        X = pd.DataFrame(X)
-        row_numbers = list(X.index)
+        # Откуда y? -Колонки, которые будем предсказывать
+        # X[self.y_columns] = ""
+        X["cash_flow_details_name"] = ""
 
-        X[self.y_cols] = ""
-
-        pipeline = self._get_pipeline()
-        X_y = pipeline.transform(X).copy()
-        X_result = X.copy()
-
-        X = X_y[self.x_columns].to_numpy()
-        y = model.predict(X)
-        X_y[y_col] = y.ravel()
+        # X = X_y[self.x_columns].to_numpy()
+        # y = self._model.predict(X)
+        # X_y[y_col] = y.ravel()
         # details cols
-        all_classes_names = df["detail_name"]
-        wordvec = dict(zip(all_classes_names, [self._model.wv[cls] for cls in c]))
-        res = []
-        preprocessed_sentences = []
 
+        res = []
+
+        sentences = prepare_sentences(X, self.str_columns)
+
+        all_classes_names = self.all_classes_names
+        if USE_DETAILED_LOG:
+            logging.info("Overall classes %d", len(self.all_classes_names))
+            logging.info("Feed model with %d txt columns", len(X.columns))
+        wordvec = dict(
+            zip(all_classes_names, [self._model.wv[cls] for cls in all_classes_names])
+        )
         for sentence in sentences:
             # Предобработка текста
             processed_text = preprocess_text(" ".join(sentence[:-1]))
-            preprocessed_sentences.append(processed_text)
 
             # Получение вектора и вычисление схожести
-            target_vector = self._model.model.wv[processed_text]
+            target_vector = self._model.wv[processed_text]
 
             words = list(wordvec.keys())
             vectors = list(wordvec.values())
 
             # Вычисление косинусной схожести и поиск максимума за один проход
-            similarities = self._model.model.wv.cosine_similarities(
-                target_vector, vectors
-            )
+            similarities = self._model.wv.cosine_similarities(target_vector, vectors)
             max_index = similarities.argmax()
-            top_match = (words[max_index], similarities[max_index])
+            top_match = EmbedPredictionsRow(
+                pred_label=words[max_index], pred_prob=similarities[max_index]
+            )
 
             res.append(top_match)
 
-        detpred, sents = get_details(sentences)
-        predictions = pd.DataFrame(detpred, columns=["pred_label", "pred_prob"])
-        txt_cols.extend(["pred_label", "base_document_number"])
-
-        df["pred_num"] = df["pred_label"].map({v: k for k, v in det_name_map.items()})
-        return res, preprocessed_sentences
+        # detpred = res
+        # predictions = pd.DataFrame(detpred, columns=["pred_label", "pred_prob"])
+        # TODO: как признак в cb.models
+        # txt_cols.extend(["pred_label", "base_document_number"])
+        # df["pred_num"] = df["pred_label"].map({v: k for k, v in det_name_map.items()})
+        # return predictions.to_json(orient="records")
+        return res
 
     def _save_column_model(self, column, item=None):
-        if not os.path.isdir(os.path.join(MODEL_FOLDER, self.uid, column)):
-            os.makedirs(os.path.join(MODEL_FOLDER, self.uid, column))
-
-        if item is not None:
-            if self.strict_acc.get(column) and self.strict_acc[column].get(item):
-                value = self.strict_acc[column][item]
-                with open(
-                    os.path.join(
-                        MODEL_FOLDER, self.uid, column, "{}.json".format(item)
-                    ),
-                    "w",
-                ) as fp:
-                    json.dump({"value": int(value)}, fp)
-            elif self.field_models.get(column) and self.field_models.get(column).get(
-                str(item)
-            ):
-                self._save_cb_model(self.field_models[column][str(item)], column, item)
-        else:
-            if self.strict_acc.get(column):
-                with open(
-                    os.path.join(MODEL_FOLDER, self.uid, column, "sum.json"), "w"
-                ) as fp:
-                    value = self.strict_acc[column]
-                    json.dump({"value": int(value)}, fp)
-            elif self.field_models.get(column):
-                self._save_cb_model(self.field_models[column], column)
+        # TODO:
+        pass
 
     def _load_column_model(self, column, item=None):
-        if item is not None:
-            if os.path.exists(
-                os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-            ):
-                if not self.strict_acc.get(column):
-                    self.strict_acc[column] = {}
-                with open(
-                    os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-                ) as fp:
-                    self.strict_acc[column][item] = np.int64(json.load(fp)["value"])
-            elif os.path.exists(
-                os.path.join(MODEL_FOLDER, self.uid, column, "{}.cbm".format(item))
-            ):
-                self._load_cb_model(column, item)
+        pass
+
+    async def _transform_dataset(
+        self,
+        dataset: pd.DataFrame,
+        parameters,
+        need_to_initialize,
+        train_test_indexes=None,
+        calculate_metrics=False,
+    ):
+        # TODO: отдельно check_data? Но это же в другом слое..?
+        if USE_DETAILED_LOG:
+            logger.info("Transforming and checking data")
+
+        for col in ["cash_flow_item_name", "cash_flow_details_name"]:
+            if col not in dataset.columns:
+                dataset[col] = ""
+
+        pipeline_list = []
+        pipeline_list.append(("checker", Checker(self.parameters)))
+        pipeline_list.append(("nan_processor", NanProcessor(self.parameters)))
+        # pipeline_list.append(("feature_adder", FeatureAdder(self.parameters)))
+        # if self.need_to_encode:
+        #     if need_to_initialize:
+        #         self.data_encoder = DataEncoder(self.parameters)
+        #     self.data_encoder.form_encode_dict = need_to_initialize
+        #     pipeline_list.append(("data_encoder", self.data_encoder))
+
+        # pipeline_list.append(("shuffler", Shuffler(self.parameters)))
+
+        pipeline = Pipeline(pipeline_list)
+        dataset = pipeline.fit_transform(dataset)
+
+        datasets = {}
+
+        if train_test_indexes:
+            datasets["train"] = dataset.iloc[train_test_indexes[0]]
+            datasets["test"] = dataset.iloc[train_test_indexes[1]]
         else:
-            if os.path.exists(os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")):
-                with open(
-                    os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")
-                ) as fp:
-                    self.strict_acc[column] = np.int64(json.load(fp)["value"])
-            elif os.path.exists(
-                os.path.join(MODEL_FOLDER, self.uid, column, "sum.cbm")
-            ):
-                self._load_cb_model(column)
+            datasets["train"] = dataset
+
+        return datasets

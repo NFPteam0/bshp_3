@@ -614,7 +614,7 @@ class ModelManager:
 
                     model = None
 
-                    model = self._get_new_model(ModelTypes.fstxt)
+                    model = self._get_new_model(ModelTypes.fstxt, "all_bases")
                     await model.load(uid=str(uuid.uuid4))
 
                     if model:
@@ -624,6 +624,11 @@ class ModelManager:
                                 "base_name": model.base_name,
                                 "model": model,
                             }
+                        )
+                        logger.info(
+                            "Model %s %s was registred",
+                            model.model_type,
+                            model.base_name,
                         )
                     else:
                         logger.warning(
@@ -677,7 +682,8 @@ class ModelManager:
     async def write_model(self, model):
         await model.save()
 
-    def get_model(self, model_type=ModelTypes.rf, base_name=""):
+    def get_model(self, model_type=ModelTypes.rf, base_name="all_bases"):
+        logger.info("Get model with params: %s %s", model_type, base_name)
         model_list = [
             el
             for el in self.models
@@ -748,5 +754,14 @@ class ModelManager:
         }
 
 
-def get_model_manager() -> ModelManager:
-    return ModelManager()
+model_manager = None
+
+
+def init_manager() -> ModelManager:
+    global model_manager
+    model_manager = ModelManager()
+    return model_manager
+
+
+def get_model_manager():
+    return model_manager

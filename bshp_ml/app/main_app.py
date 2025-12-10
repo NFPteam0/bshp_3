@@ -23,8 +23,8 @@ from fastapi import (
 from fastapi.exceptions import HTTPException
 from fastapi.responses import HTMLResponse  # FileResponse
 
-from tasks import data_loader
-from ml import ModelManager
+from tasks.__init__ import data_loader
+from ml import ModelManager, init_manager as init_model_manager, get_model_manager
 from schemas.models import (
     DataRow,
     ModelInfo,
@@ -40,7 +40,7 @@ from tasks.processing import process_fitting_model, process_uploading_task
 from db import db_processor
 from tasks import task_manager
 
-model_manager = ModelManager()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
@@ -116,7 +116,9 @@ async def lifespan(app: FastAPI):
 
     try:
         logger.info("Starting models initialize")
-        await model_manager.read_models()  # TODO: check if got mine
+        init_model_manager()
+
+        await get_model_manager().read_models()  # TODO: check if got mine
         logger.info("Models initializing done")
     except Exception as e:
         logger.error(f"Models initializing error: {e}")
@@ -180,7 +182,6 @@ async def save_data(
         # Save file
         content = await file.read()
         file_path = await task_manager.save_upload_file(task_id, file.filename, content)  # type: ignore
-        file_path = await task_manager.save_upload_file(task_id, file.filename, content)  # type: ignore
 
         # Update task
         await task_manager.update_task(
@@ -195,7 +196,7 @@ async def save_data(
 
         # Start background task
         background_tasks.add_task(
-            process_uploading_task, data_loader, task_manager, task_id
+            process_uploading_task, task_manager, data_loader, task_id
         )
 
         return TaskResponse(task_id=task_id, message="Task processing started")
@@ -242,6 +243,7 @@ async def fit(
     base_name: str = Query(default=""),
     model_type: ModelTypes = Query(default=ModelTypes.rf),
     parameters: dict = Body(),
+    model_manager=get_model_manager(),
 ) -> TaskResponse:
     logger.info(f"Start fitting model")
 
@@ -282,6 +284,7 @@ async def delete_model(
     model_type: ModelTypes = Query(default=ModelTypes.rf),
     token: str = Depends(get_token_from_header),
     authenticated: bool = Depends(check_token),
+    model_manager=get_model_manager(),
 ) -> str:
     try:
         if not base_name:
@@ -301,6 +304,7 @@ async def get_model_info(
     model_type: ModelTypes = Query(default=ModelTypes.rf),
     token: str = Depends(get_token_from_header),
     authenticated: bool = Depends(check_token),
+    model_manager=get_model_manager(),
 ) -> ModelInfo:
     try:
         if not base_name:
@@ -352,6 +356,7 @@ async def predict(
     model_type: ModelTypes = Query(default=ModelTypes.rf),
     token: str = Depends(get_token_from_header),
     authenticated: bool = Depends(check_token),
+    model_manager=get_model_manager(),
 ) -> list[DataRow]:
     try:
         if not base_name:

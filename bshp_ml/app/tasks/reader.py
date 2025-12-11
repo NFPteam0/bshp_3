@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class Reader:
-    async def read(self, data_filter):
+    async def read(self, data_filter) -> pd.DataFrame:
         if USE_DETAILED_LOG:
             logger.info("Start reading data")
         data = await db_processor.find(

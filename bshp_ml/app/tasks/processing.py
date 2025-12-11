@@ -77,10 +77,8 @@ async def process_fitting_model(
 
         data_filter = (
             {"base_name": task.base_name} if task.base_name != "all_bases" else None
-        )
+        )  # TODO: .get()?
         if data_filter:
-            parameters["data_filter"].update(data_filter)
-
             parameters["data_filter"].update(data_filter)
 
         await model.fit(parameters)

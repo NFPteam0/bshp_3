@@ -363,7 +363,7 @@ class Model(ABC):
         self.fitting_end_date = datetime.now(UTC)
         logger.info("Fitting. Done")
 
-    async def _read_dataset(self, parameters):
+    async def _read_dataset(self, parameters) -> pd.DataFrame:
         data_filter = parameters["data_filter"]
         if USE_DETAILED_LOG:
             logger.info("Reading data from db")
@@ -569,14 +569,14 @@ class Model(ABC):
         )
         return collection_name
 
-    async def _load_dataset_from_temp(self, collection_name):
+    async def _load_dataset_from_temp(self, collection_name) -> pd.DataFrame:
         dataset = await db_processor.find(collection_name)
         dataset = pd.DataFrame(dataset)
 
         def str_to_date(value):
             try:
                 return datetime.strptime(value, r"%d.%m.%Y %H:%M:%S")
-            except:
+            except:  # noqa: E722
                 return datetime(1970, 1, 1, 0, 0, 0)
 
         for col in self.date_columns:

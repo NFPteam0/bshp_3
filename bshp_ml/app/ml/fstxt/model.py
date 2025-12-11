@@ -2,6 +2,7 @@ import json
 import logging
 import os
 
+from fastapi import HTTPException
 from sklearn.pipeline import Pipeline
 from .utils import prepare_sentences, preprocess_text
 import numpy as np
@@ -59,6 +60,22 @@ class FastTextModel(Model):
             # TODO: по опции from_pretrained=True?
             # ИНАЧЕ self._create, но нужно
             # предобработать, это не здесь
+
+            try:
+                df = await self._read_dataset(
+                    parameters={
+                        "data_filter": {}
+                        # if self.base_name != "all_bases"
+                        # else None
+                    }
+                )
+                self.all_classes_names = df["cash_flow_details_name"].unique()
+                logger.info("Classes found: %d", len(self.all_classes_names))
+            except Exception as e:
+                # TODO: другой эксцепт
+                logger.error("No classes for embeddings detected")
+                raise ValueError(f"No classes for embeddings detected due to: {e}")
+
             self._load_pretrained()
 
     def _load_pretrained(self, model_folder=MODEL_FOLDER):
@@ -138,7 +155,8 @@ class FastTextModel(Model):
     ) -> list[EmbedPredictionsRow]:
         X = pd.DataFrame(X_api)
         # predict_detail
-        if self.status != ModelStatuses.READY or self.all_classes_names is None:
+        # self.status != ModelStatuses.READY?
+        if self.all_classes_names is None:
             raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 
         # Откуда y? -Колонки, которые будем предсказывать
@@ -235,3 +253,6 @@ class FastTextModel(Model):
             datasets["train"] = dataset
 
         return datasets
+
+    async def save(self, without_models=False):
+        logging.info("Save model in %s", MODEL_FOLDER)

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataLoader:
-    """Это доступ к данным + сервисный"""
+    """Это доступ к данным  из файлов + сервисный"""
 
     # TODO: переделать
     def __init__(self):

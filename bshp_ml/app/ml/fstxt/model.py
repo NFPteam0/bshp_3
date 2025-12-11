@@ -37,19 +37,17 @@ class FastTextModel(Model):
     _model: FastText | None = None
     status: ModelStatuses = ModelStatuses.CREATED
 
-    all_classes_names: list | None = None
+    all_classes_names: dict[str, list[str]] | None = None
 
     def __init__(self, base_name: str):
         super().__init__(base_name)
         self.str_columns.extend(
-            [
-                "cash_flow_item_name",
-                "cash_flow_details_name",
-            ]
+            ["cash_flow_item_name", "cash_flow_details_name", "payment_purpose"]
         )
         self.y_columns = [
-            # "cash_flow_item_name",
-            # "cash_flow_details_name",
+            "cash_flow_item_name",
+            "cash_flow_details_name",
+            "year",
         ]
         self.need_to_encode = False
 
@@ -69,8 +67,13 @@ class FastTextModel(Model):
                         # else None
                     }
                 )
-                self.all_classes_names = df["cash_flow_details_name"].unique()
-                logger.info("Classes found: %d", len(self.all_classes_names))
+                self.all_classes_names = {
+                    col: df[col].unique() for col in self.y_columns
+                }
+                logger.info(
+                    "Classes found: %s",
+                    str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
+                )
             except Exception as e:
                 # TODO: другой эксцепт
                 logger.error("No classes for embeddings detected")
@@ -82,10 +85,10 @@ class FastTextModel(Model):
         # NOTE: у fasttext есть ивенты из коробки
         self._model = FastText.load(f"{model_folder}/pretrained/fsttxt.model")
 
-    async def _fit(self, df: pd.DataFrame, parameters, is_first=True):
+    async def _fit(self, df: pd.DataFrame, parameters, is_first=False):
         if USE_DETAILED_LOG:
             logger.info("{} fit".format("First" if is_first else "continuous"))
-
+        is_first = False  # TODO: ?
         # if is_first:
         #     self.strict_acc = {}
         #     self.test_strict_acc = {}
@@ -105,17 +108,15 @@ class FastTextModel(Model):
             # _create?
             ...
         if is_first or self.all_classes_names is None:
-            logger.info(
-                "Bare pretrained model, copy all_classes_names from df: %d objects",
-                len(df["cash_flow_details_name"].unique()),
-            )
-            self.all_classes_names = set(df["cash_flow_details_name"].unique()) - set(
-                ""
-            )
-            if USE_DETAILED_LOG:
-                logging.info("Overall classes %d", len(self.all_classes_names))
+            self.all_classes_names = {col: df[col].unique() for col in self.y_columns}
 
-        else:
+            if USE_DETAILED_LOG:
+                logger.info(
+                    "Classes found: %s",
+                    str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
+                )
+
+        if not is_first:
             new_sentences = [
                 preprocess_text(" ".join(sent)).split()
                 for sent in prepare_sentences(X, self.str_columns)
@@ -137,6 +138,7 @@ class FastTextModel(Model):
         ...
 
     def _create(self):
+        # TODO: is_first = False
         """fits from scratch"""
         self._model = FastText(
             sentences=...,
@@ -152,59 +154,86 @@ class FastTextModel(Model):
 
     async def predict(
         self, X_api: dict | list[dict], for_metrics=False
-    ) -> list[EmbedPredictionsRow]:
+    ) -> dict[str, EmbedPredictionsRow]:
         X = pd.DataFrame(X_api)
         # predict_detail
         # self.status != ModelStatuses.READY?
         if self.all_classes_names is None:
             raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 
-        # Откуда y? -Колонки, которые будем предсказывать
         # X[self.y_columns] = ""
-        X["cash_flow_details_name"] = ""
 
         # X = X_y[self.x_columns].to_numpy()
         # y = self._model.predict(X)
         # X_y[y_col] = y.ravel()
         # details cols
+        result = {}
+        for y in self.y_columns:
+            res = []
 
-        res = []
+            if y == "cash_flow_details_name":
+                result.get("cash_flow_item_name")
+                self.str_columns.append("cash_flow_item_name")
 
-        sentences = prepare_sentences(X, self.str_columns)
+            sentences = prepare_sentences(X, self.str_columns)
 
-        all_classes_names = self.all_classes_names
-        if USE_DETAILED_LOG:
-            logging.info("Overall classes %d", len(self.all_classes_names))
-            logging.info("Feed model with %d txt columns", len(X.columns))
-        wordvec = dict(
-            zip(all_classes_names, [self._model.wv[cls] for cls in all_classes_names])
-        )
-        for sentence in sentences:
-            # Предобработка текста
-            processed_text = preprocess_text(" ".join(sentence[:-1]))
+            all_classes_names = self.all_classes_names[y]
+            if USE_DETAILED_LOG:
+                logging.info("Predicting %s", y)
+                logging.info("Overall classes %d", len(self.all_classes_names[y]))
+                logging.info("Feed model with %d txt columns", len(X.columns))
+            wordvec = dict(
+                zip(
+                    all_classes_names,
+                    [self._model.wv[cls] for cls in all_classes_names],
+                )
+            )
+            # TODO: add validation?
+            for sentence in sentences:
+                # Предобработка текста
+                processed_text = preprocess_text(" ".join(sentence[:-1]))
 
-            # Получение вектора и вычисление схожести
-            target_vector = self._model.wv[processed_text]
+                # Получение вектора и вычисление схожести
+                target_vector = self._model.wv[processed_text]
 
-            words = list(wordvec.keys())
-            vectors = list(wordvec.values())
+                words = list(wordvec.keys())
+                vectors = list(wordvec.values())
 
-            # Вычисление косинусной схожести и поиск максимума за один проход
-            similarities = self._model.wv.cosine_similarities(target_vector, vectors)
-            max_index = similarities.argmax()
-            top_match = EmbedPredictionsRow(
-                pred_label=words[max_index], pred_prob=similarities[max_index]
+                # Вычисление косинусной схожести и поиск максимума за один проход
+                similarities = self._model.wv.cosine_similarities(
+                    target_vector, vectors
+                )
+                max_index = similarities.argmax()
+                top_match = EmbedPredictionsRow(
+                    pred_label=words[max_index], pred_prob=similarities[max_index]
+                )
+
+                res.append(top_match)
+
+            # detpred = res
+            # predictions = pd.DataFrame(detpred, columns=["pred_label", "pred_prob"])
+            # TODO: как признак в cb.models
+            # txt_cols.extend(["pred_label", "base_document_number"])
+            # df["pred_num"] = df["pred_label"].map({v: k for k, v in det_name_map.items()})
+            # return predictions.to_json(orient="records")
+
+            result[y] = res
+
+            X = pd.concat(
+                [
+                    X,
+                    pd.DataFrame(
+                        {
+                            f"pred_{y}": [item.pred_label for item in res],
+                            f"prob_{y}": [item.pred_prob for item in res],
+                        }
+                    ),
+                ],
+                axis=1,
+                ignore_index=False,
             )
 
-            res.append(top_match)
-
-        # detpred = res
-        # predictions = pd.DataFrame(detpred, columns=["pred_label", "pred_prob"])
-        # TODO: как признак в cb.models
-        # txt_cols.extend(["pred_label", "base_document_number"])
-        # df["pred_num"] = df["pred_label"].map({v: k for k, v in det_name_map.items()})
-        # return predictions.to_json(orient="records")
-        return res
+        return X.to_json(orient="records", force_ascii=False)
 
     def _save_column_model(self, column, item=None):
         # TODO:

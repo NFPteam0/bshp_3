@@ -84,6 +84,7 @@ class DataRow(BaseModel):
 class ExtDataRow(DataRow):
     cash_flow_details_name: str | None = None
     cash_flow_item_name: str | None = None
+    payment_purpose: str | None = None
 
 
 class EmbedPredictionsRow(BaseModel):

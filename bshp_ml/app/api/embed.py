@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Qu
 from schemas.models import DataRow, ExtDataRow, ModelTypes, EmbedPredictionsRow
 from schemas.tasks import TaskResponse
 from fastapi.encoders import jsonable_encoder
+import json
 
 from tasks.processing import process_fitting_model, process_uploading_task
 from tasks.__init__ import task_manager
@@ -75,7 +76,7 @@ async def predict_embeddings(
     # authenticated: bool = Depends(check_token),
     model_manager: ModelManager = Depends(get_model_manager),
     # ) -> list[ExtDataRow]:
-) -> list[EmbedPredictionsRow]:
+) -> list[dict]:
     # пока что без других эмбеддинг моделей
     model_type = ModelTypes.fstxt
     # TODO: depends get_model
@@ -88,7 +89,7 @@ async def predict_embeddings(
 
         model = model_manager.get_model(model_type, base_name)
         result = []
-        X_y_list = await model.predict(jsonable_encoder(X))
+        X_y_list = json.loads(await model.predict(jsonable_encoder(X)))
         result = X_y_list
         # for row in X_y_list:
         #     # TODO: можно быстрее?

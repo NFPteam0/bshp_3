@@ -28,7 +28,7 @@ from ml.data_processing import (
     Shuffler,
     FeatureAdder,
 )
-from tasks import Reader
+from tasks.__init__ import Reader
 from db import db_processor
 from schemas.models import ModelStatuses, ModelTypes
 from settings import (
@@ -518,6 +518,7 @@ class Model(ABC):
 
     async def load(self, uid):
         self.uid = uid
+        logger.info("Loaded pretrained %s models", self.model_type)
 
         self._load_parameters()
 
@@ -647,7 +648,6 @@ class ModelManager:
                     ModelTypes(parameters["model_type"]), parameters["base_name"]
                 )
                 await model.load(parameters["uid"])
-
                 # except Exception as e:
                 #     pass
 
@@ -682,8 +682,9 @@ class ModelManager:
     async def write_model(self, model):
         await model.save()
 
-    def get_model(self, model_type=ModelTypes.rf, base_name="all_bases"):
-        logger.info("Get model with params: %s %s", model_type, base_name)
+    def get_model(self, model_type=ModelTypes.rf, base_name="all_bases", log=True):
+        if log:
+            logger.info("Get model with params: %s %s", model_type, base_name)
         model_list = [
             el
             for el in self.models
@@ -692,7 +693,7 @@ class ModelManager:
         if model_list:
             model = model_list[0]["model"]
         else:
-            model = self._get_new_model(model_type, base_name)
+            model = self._get_new_model(model_type, base_name)  # TODO: ?
         return model
 
     def _get_new_model(self, model_type=ModelTypes.rf, base_name="") -> type[Model]:

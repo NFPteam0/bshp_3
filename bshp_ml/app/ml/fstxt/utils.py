@@ -3,40 +3,31 @@ import pandas as pd
 from gensim.models import FastText
 import numpy as np
 
+RE_CHARS = re.compile(r"[^a-zA-Zа-яА-ЯёЁ0-9\s]")
+RE_SPACES = re.compile(r"\s+")
 
-def preprocess_text(text):
+
+def preprocess_text(s: pd.Series) -> pd.Series:
     """
     Функция для очистки текста
     """
-    if not isinstance(text, str):
-        return ""
+    s = s.fillna("").astype(str).str.lower()
+    s = s.str.replace(RE_CHARS, " ", regex=True)
+    s = s.str.replace(RE_SPACES, " ", regex=True).str.strip()
 
-    text = text.lower()
-
-    text = re.sub(r"[^a-zA-Zа-яА-ЯёЁ0-9\s]", " ", text)
-
-    text = re.sub(r"\s+", " ", text).strip()
-
-    text = " ".join(list(filter(lambda x: not x.isnumeric(), text.split())))
-
-    return text
+    return s
 
 
-def prepare_sentences(df, txt_cols):
+def prepare_sentences(df: pd.DataFrame, txt_cols) -> list[list[str]]:
     """
     Подготавливает предложения для обучения FastText
     """
-    sentences = []
+    df_txt = df[txt_cols].astype(str)
+    df_txt = df_txt.agg(" ".join, axis=1)
 
-    for i in range(len(df)):
-        combined_text = " ".join(
-            [str(df[col].iloc[i]) for col in txt_cols if col in df.columns]
-        )
+    cleaned = preprocess_text(df_txt)
 
-        cleaned_text = preprocess_text(combined_text)
-        if cleaned_text:
-            words = cleaned_text.split()
-            sentences.append(words)
+    sentences = cleaned[cleaned != ""].str.split().to_list()
 
     return sentences
 

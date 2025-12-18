@@ -1,3 +1,5 @@
+import copy
+from functools import lru_cache
 import json
 import logging
 import os
@@ -7,7 +9,7 @@ from sklearn.pipeline import Pipeline
 from .utils import prepare_sentences, preprocess_text
 import numpy as np
 from gensim.models import FastText
-from ..models import Model
+from ..models import Model, get_model_manager
 from ml.data_processing import (
     Checker,
     DataEncoder,
@@ -117,10 +119,11 @@ class FastTextModel(Model):
                 )
 
         if not is_first:
-            new_sentences = [
-                preprocess_text(" ".join(sent)).split()
-                for sent in prepare_sentences(X, self.str_columns)
-            ]
+            # new_sentences = [
+            #     preprocess_text(" ".join(sent)).split()
+            #     for sent in prepare_sentences(X, self.str_columns)
+            # ]
+            new_sentences = prepare_sentences(X, self.str_columns)
 
             logger.info(
                 "Training pretrained model with %d ngrams", self._model.word_ngrams
@@ -167,52 +170,57 @@ class FastTextModel(Model):
         # y = self._model.predict(X)
         # X_y[y_col] = y.ravel()
         # details cols
+        # TODO: в numpy массивы - будет быстрее?
+        all_sentences = prepare_sentences(X, self.str_columns)
+        sentences = all_sentences
         result = {}
         for y in self.y_columns:
             res = []
-
+            sentences_i = None
             if y == "cash_flow_details_name":
-                result.get("cash_flow_item_name")
-                self.str_columns.append("cash_flow_item_name")
-
-            sentences = prepare_sentences(X, self.str_columns)
-
+                # result.get("cash_flow_item_name")
+                self.str_columns.append("pred_cash_flow_item_name")  # TODO: без ошибки?
+                # TODO: долго
+                if "pred_cash_flow_item_name" in X.columns:
+                    sentences_i = prepare_sentences(X, ["pred_cash_flow_item_name"])
+                else:
+                    logger.warning("No predictions for items")
+                if sentences_i:
+                    sentences = [
+                        sent + sent_i for sent, sent_i in zip(sentences, sentences_i)
+                    ]
+            else:
+                sentences = all_sentences
             all_classes_names = self.all_classes_names[y]
             if USE_DETAILED_LOG:
                 logging.info("Predicting %s", y)
                 logging.info("Overall classes %d", len(self.all_classes_names[y]))
                 logging.info("Feed model with %d txt columns", len(X.columns))
-            wordvec = dict(
-                zip(
-                    all_classes_names,
-                    [self._model.wv[cls] for cls in all_classes_names],
-                )
-            )
+            wordvec = {cls: self._model.wv[cls] for cls in all_classes_names}
+            vectors = np.vstack(list(wordvec.values()))
+            words = list(wordvec.keys())
             # TODO: add validation?
             for sentence in sentences:
-                # Предобработка текста
-                processed_text = preprocess_text(" ".join(sentence[:-1]))
-
                 # Получение вектора и вычисление схожести
-                target_vector = self._model.wv[processed_text]
-
-                words = list(wordvec.keys())
-                vectors = list(wordvec.values())
-
+                # target_vector = self.sentence_vector(sentence, self._model.wv)
+                target_vector = self.sentence_vector_cached(
+                    tuple(sentence), self.base_name, self.model_type
+                )
                 # Вычисление косинусной схожести и поиск максимума за один проход
                 similarities = self._model.wv.cosine_similarities(
                     target_vector, vectors
                 )
+
                 max_index = similarities.argmax()
                 top_match = EmbedPredictionsRow(
-                    pred_label=words[max_index], pred_prob=similarities[max_index]
+                    pred_label=words[max_index],
+                    pred_prob=float(similarities[max_index]),
                 )
 
                 res.append(top_match)
 
             # detpred = res
             # predictions = pd.DataFrame(detpred, columns=["pred_label", "pred_prob"])
-            # TODO: как признак в cb.models
             # txt_cols.extend(["pred_label", "base_document_number"])
             # df["pred_num"] = df["pred_label"].map({v: k for k, v in det_name_map.items()})
             # return predictions.to_json(orient="records")
@@ -233,7 +241,30 @@ class FastTextModel(Model):
                 ignore_index=False,
             )
 
-        return X.to_json(orient="records", force_ascii=False)
+        return X.to_json(
+            orient="records", force_ascii=False, date_format="iso", date_unit="s"
+        )
+
+    def sentence_vector(self, words: list[str], wv):
+        v = [wv[word] for word in words]
+        return np.mean(v, axis=0)
+
+    @staticmethod
+    @lru_cache(maxsize=20_000)
+    def wv_cached(word: str, base_name: str, model_type: str):
+        model_manager = get_model_manager()
+        model = model_manager.get_model(model_type, base_name, log=False)
+        return model._model.wv[word]
+
+    @staticmethod
+    @lru_cache()
+    def sentence_vector_cached(words: tuple[str], base_name: str, model_type: str):
+        # TODO: кэш на уровень слов?
+        # model_manager = get_model_manager()
+        # model = model_manager.get_model(model_type, base_name, log=False)
+        # v = [model._model.wv[word] for word in words]
+        v = [FastTextModel.wv_cached(word, base_name, model_type) for word in words]
+        return np.mean(v, axis=0)
 
     def _save_column_model(self, column, item=None):
         # TODO:

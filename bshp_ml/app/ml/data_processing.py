@@ -137,7 +137,7 @@ class Checker(BaseEstimator, TransformerMixin):
                 "Fitting dataset is empty. Load more data or change filter."
             )
         if USE_DETAILED_LOG:
-            logger.info("Checking data. Done")
+            logger.info("Checking data. Done. Shape, %s", str(X.shape))
         return X
 
 
@@ -156,8 +156,11 @@ class DataEncoder(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
         if USE_DETAILED_LOG:
-            logger.info("Start encoding data")
-            logger.info("Form encode dict")
+            logger.info("Start encoding data, shape: %s", str(X.shape))
+            logger.info(
+                "Form encode dict for columns: %s",
+                ", ".join([col for col in X.columns if col in self.columns_to_encode]),
+            )
         if self.form_encode_dict:
             for col in self.columns_to_encode:
                 uniq = list(X[col].unique())
@@ -171,18 +174,18 @@ class DataEncoder(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         if USE_DETAILED_LOG:
-            logger.info("Encoding")
+            logger.info("Encoding, shape: %s", str(X.shape))
         for col in self.columns_to_encode:
             X[col] = X[col].apply(lambda x: self._get_encoded_field(x, col))
 
         X = X[self.additional_columns + self.x_columns + self.y_columns]
         if USE_DETAILED_LOG:
-            logger.info("Encoding data. Done")
+            logger.info("Encoding data. Done. Shape: %s", str(X.shape))
         return X
 
     def inverse_transform(self, X):
         if USE_DETAILED_LOG:
-            logger.info("Start decoding data")
+            logger.info("Start decoding data. Shape: %s", str(X.shape))
         self.decode_dict = {}
         if self.form_encode_dict:
             for col in self.encode_dict:
@@ -192,7 +195,7 @@ class DataEncoder(BaseEstimator, TransformerMixin):
         for col in self.columns_to_encode:
             X[col] = X[col].apply(lambda x: self._get_decoded_field(x, col))
         if USE_DETAILED_LOG:
-            logger.info("Decoding data. Done")
+            logger.info("Decoding data. Done. Shape: %s", str(X.shape))
         return X
 
     def _get_decoded_field(self, value, field):
@@ -218,20 +221,26 @@ class FeatureAdder(BaseEstimator, TransformerMixin):
         self.additional_columns = self.parameters["additional_columns"]
         self.str_columns = self.parameters["str_columns"]
         self.float_columns = self.parameters["float_columns"]
+        self.date_columns = self.parameters["date_columns"]
 
     def fit(self, X, y=None):
         return self
 
-    def transform(self, X):
+    def transform(self, X_df):
+        X = X_df.copy()
         if USE_DETAILED_LOG:
             logger.info("Feature adding")
+
+        for col in self.date_columns:
+            if X[col].dtype in ["string", "object"]:
+                X[col] = X[col].apply(str_to_date)
 
         X["document_year"] = X["date"].apply(self._get_year)
         X["document_month"] = X["date"].apply(self._get_month)
 
-        X = X[self.additional_columns + self.x_columns + self.y_columns].copy()
+        # X = X[self.additional_columns + self.x_columns + self.y_columns].copy()
         if USE_DETAILED_LOG:
-            logger.info("Adding features. Done")
+            logger.info("Adding features. Done. Shape: %s", str(X.shape))
         return X
 
     def _get_month(self, date_value: datetime):
@@ -262,6 +271,8 @@ class NanProcessor(BaseEstimator, TransformerMixin):
         """
         if USE_DETAILED_LOG:
             logger.info("Start processing Nan values")
+        self.str_columns = [col for col in self.str_columns if col in x.columns]
+        self.float_columns = [col for col in self.float_columns if col in x.columns]
         x[self.str_columns] = x[self.str_columns].fillna("")
         x[self.float_columns] = x[self.float_columns].fillna(0)
         x.loc[x["year"] == "", "year"] = "0"
@@ -289,6 +300,13 @@ class Shuffler(BaseEstimator, TransformerMixin):
         if USE_DETAILED_LOG:
             logger.info("Data shuffling. Done")
         return result
+
+
+def str_to_date(value):
+    try:
+        return datetime.strptime(value, r"%d.%m.%Y %H:%M:%S")
+    except:  # noqa: E722
+        return datetime(1970, 1, 1, 0, 0, 0)
 
 
 # def convert_dates_in_db_filter(db_filter, is_period=False):

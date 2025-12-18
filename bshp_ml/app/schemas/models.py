@@ -69,6 +69,18 @@ class DataRow(BaseModel):
 
         return result
 
+    @field_validator("article_row_number", mode="before")
+    def check_article_row_number(cls, value):
+        if not value:
+            return 0
+        elif isinstance(value, str):
+            result = int(value)
+        elif isinstance(value, int):
+            result = value
+        else:
+            return 0
+        return result
+
     @field_validator("article_document_date", mode="before")
     def check_article_document_date(cls, value):
         if not value:
@@ -111,3 +123,4 @@ class ModelTypes(str, Enum):
     rf = "rf"
     catboost = "catboost"
     fstxt = "fasttext"
+    catboost_txt = "catboost+"

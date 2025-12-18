@@ -243,7 +243,7 @@ async def fit(
     base_name: str = Query(default=""),
     model_type: ModelTypes = Query(default=ModelTypes.rf),
     parameters: dict = Body(),
-    model_manager=get_model_manager(),
+    model_manager=Depends(get_model_manager),
 ) -> TaskResponse:
     logger.info(f"Start fitting model")
 
@@ -284,17 +284,15 @@ async def delete_model(
     model_type: ModelTypes = Query(default=ModelTypes.rf),
     token: str = Depends(get_token_from_header),
     authenticated: bool = Depends(check_token),
-    model_manager=get_model_manager(),
+    model_manager=Depends(get_model_manager),
 ) -> str:
     try:
         if not base_name:
-            base_name = "all_bases"
             base_name = "all_bases"
         await model_manager.delete_model(model_type=model_type, base_name=base_name)
         return "Model has been deleted"
     except Exception as e:
         logger.error(f"Error deleting model: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -304,7 +302,7 @@ async def get_model_info(
     model_type: ModelTypes = Query(default=ModelTypes.rf),
     token: str = Depends(get_token_from_header),
     authenticated: bool = Depends(check_token),
-    model_manager=get_model_manager(),
+    model_manager=Depends(get_model_manager),
 ) -> ModelInfo:
     try:
         if not base_name:
@@ -322,33 +320,6 @@ async def get_model_info(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# @app.post("/predict_pretrained")
-# async def predict_pretrained(
-#     X: list[DataRow],
-#     base_name: str = Query(default=""),
-#     model_type: ModelTypes = Query(default=ModelTypes.rf),
-#     token: str = Depends(get_token_from_header),
-#     authenticated: bool = Depends(check_token),
-# ) -> list[DataRow]:
-#     try:
-#         if not base_name:
-#             base_name = "all_bases"
-#         X_list = []
-#         for row in X:
-#             X_list.append(row.model_dump())
-#         model = model_manager.get_model(model_type, base_name)
-#         result = []
-#         X_y_list = await model.predict(X_list)
-#         for row in X_y_list:
-#             result.append(DataRow.model_validate(row))
-#     except Exception as e:
-#         print(traceback.format_exc())
-#         logger.error(f"Error predicting: {e}")
-#         raise HTTPException(status_code=500, detail=str(e))
-
-#     return result
-
-
 @app.post("/predict")
 async def predict(
     X: list[DataRow],
@@ -356,7 +327,7 @@ async def predict(
     model_type: ModelTypes = Query(default=ModelTypes.rf),
     token: str = Depends(get_token_from_header),
     authenticated: bool = Depends(check_token),
-    model_manager=get_model_manager(),
+    model_manager=Depends(get_model_manager),
 ) -> list[DataRow]:
     try:
         if not base_name:
@@ -388,6 +359,7 @@ async def get_task_status(
     return status
 
 
-from api import embed_router
+from api import embed_router, cb_router
 
 app.include_router(embed_router)
+app.include_router(cb_router)

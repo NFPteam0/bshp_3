@@ -44,6 +44,7 @@ from tasks.__init__ import Reader
 from ..models import Model
 from .classifier import CatBoostModel, CbCallBack
 from .utils import decode_cat, encode_cat, eval_model, make_all_data
+from .data_processing import CBDataEncoder
 
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)

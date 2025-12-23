@@ -171,7 +171,8 @@ class FastTextModel(Model):
         # X_y[y_col] = y.ravel()
         # details cols
         # TODO: в numpy массивы - будет быстрее?
-        all_sentences = prepare_sentences(X, self.str_columns)
+        tmp_cols = []
+        all_sentences = prepare_sentences(X, self.str_columns + tmp_cols)
         sentences = all_sentences
         result = {}
         for y in self.y_columns:
@@ -179,10 +180,10 @@ class FastTextModel(Model):
             sentences_i = None
             if y == "cash_flow_details_name":
                 # result.get("cash_flow_item_name")
-                self.str_columns.append("pred_cash_flow_item_name")  # TODO: без ошибки?
+                tmp_cols.append("pred_cash_flow_item_name")
                 # TODO: долго
                 if "pred_cash_flow_item_name" in X.columns:
-                    sentences_i = prepare_sentences(X, ["pred_cash_flow_item_name"])
+                    sentences_i = prepare_sentences(X, tmp_cols)
                 else:
                     logger.warning("No predictions for items")
                 if sentences_i:
@@ -259,10 +260,6 @@ class FastTextModel(Model):
     @staticmethod
     @lru_cache()
     def sentence_vector_cached(words: tuple[str], base_name: str, model_type: str):
-        # TODO: кэш на уровень слов?
-        # model_manager = get_model_manager()
-        # model = model_manager.get_model(model_type, base_name, log=False)
-        # v = [model._model.wv[word] for word in words]
         v = [FastTextModel.wv_cached(word, base_name, model_type) for word in words]
         return np.mean(v, axis=0)
 

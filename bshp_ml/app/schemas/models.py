@@ -1,3 +1,4 @@
+import pandas as pd
 from pydantic import BaseModel, field_validator
 from enum import Enum
 from datetime import datetime
@@ -97,6 +98,14 @@ class ExtDataRow(DataRow):
     cash_flow_details_name: str | None = None
     cash_flow_item_name: str | None = None
     payment_purpose: str | None = None
+    payment_purpose_returned: str | None = None
+
+
+class MetadataCb(Enum):
+    x: tuple[str] = ""
+    y: tuple[str] = ""
+    txt: tuple[str] = ""
+    cat: tuple[str] = ""
 
 
 class EmbedPredictionsRow(BaseModel):

@@ -39,6 +39,9 @@ async def fit(
     parameters: dict = Body(),
     model_manager: ModelManager = Depends(get_model_manager),
     fit_embeddings: bool = False,
+    model_type: ModelTypes = Query(
+        default=ModelTypes.catboost_txt
+    ),  # ни на что не влияет, всегда эта модель
 ):
     if not base_name:
         base_name = "all_bases"
@@ -128,10 +131,12 @@ async def fit(
 async def predict(
     X: list[ExtDataRow],
     base_name: str = Query(default=""),
-    # model_type: ModelTypes = Query(default=ModelTypes.rf),
     # token: str = Depends(get_token_from_header),
     # authenticated: bool = Depends(check_token),
     model_manager: ModelManager = Depends(get_model_manager),
+    model_type: ModelTypes = Query(
+        default=ModelTypes.catboost_txt
+    ),  # ни на что не влияет, всегда эта модель
 ):
     if not base_name:
         base_name = "all_bases"

@@ -540,6 +540,9 @@ class Model(ABC):
         if os.path.isdir(path_to_model):
             shutil.rmtree(path_to_model)
 
+        if USE_DETAILED_LOG:
+            logger.info("Saving models in %s", os.path.join(MODEL_FOLDER, self.uid))
+
         if not without_models:
             for y_col in self.y_columns:
                 path_to_col = os.path.join(MODEL_FOLDER, self.uid, y_col)
@@ -691,7 +694,7 @@ class ModelManager:
             if el["model_type"] == model_type and el["base_name"] == base_name
         ]
         if model_list:
-            model = model_list[0]["model"]
+            model = model_list[-1]["model"]
         else:
             model = self._get_new_model(model_type, base_name)  # TODO: ?
         return model

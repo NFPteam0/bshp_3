@@ -11,7 +11,7 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Optional
-
+from sklearn import set_config
 import numpy as np
 import pandas as pd
 from catboost import CatBoost, Pool
@@ -67,7 +67,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         self.categorical = [
             "moving_type",
             "company_inn",
-            "company_kpp",
+            "company_kpp",  # TODO: убрать
             "base_document_kind",
             "contractor_inn",
             "contractor_kind",
@@ -92,7 +92,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "date",
             "base_document_date",
             "article_document_date",
-            "uploading_date",
+            # "uploading_date",
         ]
         self.parameters = {
             "x_columns": self.x_columns,
@@ -181,7 +181,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
         Traines few models and choses best based on a given catboost parametrs
         """
         param_grid = {
-            "learning_rate": [lr, 0.002, 0.004],
+            "learning_rate": [
+                lr,
+                #   0.002,
+                # 0.004,
+            ],
             "depth": [6],
             "iterations": [
                 trees,
@@ -261,8 +265,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
             logger.info(f"Predict {len(df[y])} records")
 
         bscores = []
-        total_preds = pd.DataFrame(index=df.index)
-
+        # total_preds = pd.DataFrame(index=df.index)
+        df = df.copy()
         if y == "cash_flow_details_code":
             self.field_models[y] = {}
             for item in df["cash_flow_item_code"].unique():
@@ -279,12 +283,17 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                 df_i[f"{y}_norm"] = df_i[y].copy().map(det_map1)
 
-                # TODO: вынести наверх
                 to_drop = [y for y in to_drop if y in df_i.columns]
-                to_drop.extend([c for c in self.str_columns if c in df_i.columns])
+                to_drop.extend(
+                    [
+                        c
+                        for c in self.str_columns
+                        if c in df_i.columns and c not in self.categorical
+                    ]
+                )
 
                 df_i.drop(to_drop, inplace=True, axis=1)
-                df_i.fillna("empty", inplace=True)
+                # df_i.fillna("empty", inplace=True)
 
                 all_data = make_all_data(df_i, f"{y}")
                 all_classes = all_data[f"{y}_norm"].unique()
@@ -295,10 +304,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                     bscores.extend([1 for _ in range(len(df_i[f"{y}_norm"]))])
                     # total_preds.extend([this_label for _ in range(len(df_i[f'{y}_norm']))])
-                    total_preds.loc[df_i.index, "model_pred"] = [
-                        this_label for _ in range(len(df_i))
-                    ]
+                    # total_preds.loc[df_i.index, "model_pred"] = [
+                    #     this_label for _ in range(len(df_i))
+                    # ]
                     print("Only one details code, no need for model")
+                    # TODO: сохранить словарь
+                    self.strict_acc[y][item] = this_label
                     continue
 
                 # rm txt from models inputs
@@ -335,12 +346,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                 test_pool = self.get_test_pool(
                     df_test=df_test,
-                    to_drop=[i for i in to_drop if i in df_i.columns],
-                    cat_idxs=[
-                        df_test.columns.get_loc(key=cat)
-                        for cat in self.categorical
-                        if cat in df_test.columns
-                    ],
+                    to_drop=[],
+                    cat_idxs=cat_idxs,
                     all_data=all_data,
                     y=f"{y}_norm",
                 )
@@ -351,12 +358,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     cat_idxs=cat_idxs,
                     test_pool=test_pool,
                     y=f"{y}_norm",
-                    to_drop=[i for i in to_drop if i in df_i.columns],
+                    to_drop=[],
                     lr=parameters.get("lr", 0.01),
                     trees=parameters.get("trees", 30),
                     all_data=all_data,
                 )
                 self.field_models[y][item] = model_i
+                self._save_cb_model(model_i, column=y, item=item)
         else:
             if USE_DETAILED_LOG:
                 logger.info(f"Found {len(df[y])} records")
@@ -364,32 +372,39 @@ class CatBoostModelEmbeddings(CatBoostModel):
             det_unmap1 = {v: k for k, v in det_map1.items()}
 
             df[f"{y}_norm"] = df[y].copy().map(det_map1)
-            df = df.drop(to_drop, axis=1)
+
+            to_drop = [y for y in to_drop if y in df.columns]
+            to_drop.extend(
+                [
+                    c
+                    for c in self.str_columns
+                    if c in df.columns and c not in self.categorical
+                ]
+            )
+            df.drop(to_drop, axis=1, inplace=True)
+
+            all_data = make_all_data(df, f"{y}")
+            all_classes = all_data[f"{y}_norm"].unique()
+            if USE_DETAILED_LOG:
+                logger.info("Total len of classes data: %s", len(all_data))
+
+            if len(all_data) == 1:
+                # TODO: get rid of this, save encoder to .pkl
+                this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
+                bscores.extend([1 for _ in range(len(df[f"{y}_norm"]))])
+                # total_preds.loc[df.index, f"{y}_pred"] = [
+                #     this_label for _ in range(len(df))
+                # ]
+                # (f"Only one {y} code, no need for model")
+            # X, y train
+            df_test = df.sample(frac=0.05, random_state=SEED)
+            df_train = df.drop(df_test.index)
+
             cat_idxs = [
                 df.columns.get_loc(key=cat)
                 for cat in self.categorical
                 if cat in df.columns
             ]
-
-            all_data = make_all_data(df, f"{y}")
-            all_classes = all_data[f"{y}_norm"].unique()
-
-            if len(all_data) == 1:
-                this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
-                bscores.extend([1 for _ in range(len(df[f"{y}_norm"]))])
-                total_preds.loc[df.index, f"{y}_pred"] = [
-                    this_label for _ in range(len(df))
-                ]
-                # (f"Only one {y} code, no need for model")
-            if USE_DETAILED_LOG:
-                logger.info("Total len of classes data: %s", len(all_data))
-
-            to_drop = [y for y in to_drop if y in df.columns]
-            to_drop.extend([c for c in self.str_columns if c in df.columns])
-            # X, y train
-            df_test = df.drop(to_drop, axis=1).sample(frac=0.05, random_state=SEED)
-            df_train = df.drop(to_drop, axis=1).drop(df_test.index)
-
             if len(df_test) == 0:
                 df_test = df_train.copy()
 
@@ -398,9 +413,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
             test_pool = self.get_test_pool(
                 df_test=df_test,
-                to_drop=to_drop,
+                to_drop=[],
                 y=f"{y}_norm",
-                cat_idxs=cat_idxs,
+                cat_idxs=[
+                    df_test.columns.get_loc(key=cat)
+                    for cat in self.categorical
+                    if cat in df_test.columns
+                ],
                 all_data=all_data,
             )
             model_i = self.gridsearch(
@@ -410,12 +429,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 cat_idxs=cat_idxs,
                 test_pool=test_pool,
                 y=f"{y}_norm",
-                to_drop=to_drop,
+                to_drop=[],
                 lr=parameters.get("lr", 0.01),
                 trees=parameters.get("trees", 30),
                 all_data=all_data,
             )
             self.field_models[y] = model_i
+            self._save_cb_model(model_i, y)
 
     async def _fit(self, df: pd.DataFrame, parameters: dict, is_first=True):
         is_first = True  # TODO: ?
@@ -423,13 +443,14 @@ class CatBoostModelEmbeddings(CatBoostModel):
             logger.info("{} fit".format("First" if is_first else "continuous"))
 
         for y in self.y_columns:
+            self.strict_acc[y] = {}
             if USE_DETAILED_LOG:
                 logger.info('Start Fitting model. Field = "{}"'.format(y))
                 logger.info(
                     f"Columns to predict: {self.y_columns}, got columns: {df.columns}, shape: {df.shape}"
                 )
             self.train_on_field(
-                df=df, y=y, to_drop=self.str_columns, parameters=parameters
+                df=df, y=y, to_drop=self.y_columns, parameters=parameters
             )
             gc.collect()
             # self._save_cb_model(model, column=y, item=item)
@@ -497,7 +518,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
     async def predict(self, X: pd.DataFrame, for_metrics=False):
         if not for_metrics and self.status != ModelStatuses.READY:
             raise ValueError("Model is not ready. Fit it before.")
-
+        # load for details code
         field_models = self.field_models
         if USE_DETAILED_LOG:
             logger.info("Transforming and checking data")
@@ -520,62 +541,99 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         for y in self.y_columns:
             X[y] = ""
+        # set_config(transform_output="pandas")
+        X_y = pipeline.fit_transform(X).copy()
 
-        X_y = pipeline.transform(X).copy()
-
-        c_x_columns = self.x_columns
+        # c_x_columns = self.x_columns + [
+        #     "number",
+        #     "date",
+        #     # "pred_cash_flow_item_name",
+        #     # "pred_cash_flow_details_name",
+        # ]
 
         for y in self.y_columns:
             if USE_DETAILED_LOG:
                 logger.info('Start predicting. Field = "{}"'.format(y))
             if y == "cash_flow_details_code":
                 cash_flow_items = list(X_y["cash_flow_item_code"].unique())
-                X_y["row_number"] = row_numbers
+                # X_y["row_number"] = row_numbers
                 X_y_list = []
 
                 for ind, item_col in enumerate(cash_flow_items):
                     if USE_DETAILED_LOG:
                         logger.info("Predicting {} - {}".format(ind, item_col))
 
-                    c_X_y = X_y.loc[X_y["cash_flow_item_code"] == item_col].copy()
+                    Xy1 = X_y.loc[X_y["cash_flow_item_code"] == item_col].copy()
 
                     if (
                         self.strict_acc.get(y) is not None
                         and self.strict_acc[y].get(item_col) is not None
                     ):
-                        c_X_y[y] = self.strict_acc[y][item_col]
+                        # No model nedeed
+                        Xy1[y] = self.strict_acc[y][item_col]
                     else:
-                        X = c_X_y[self.x_columns].to_numpy()
+                        model = field_models[y][str(item_col)]
 
-                        c_model = field_models[y][str(item_col)]
-                        y_pred = c_model.predict(X)
-                        c_X_y[y] = y_pred.ravel()
+                        X = Xy1[self.x_columns].to_numpy()
+                        Xy1 = Xy1[[feat for feat in model.feature_names_]]
+                        cat_idxs = [
+                            Xy1.columns.get_loc(key=cat)
+                            for cat in self.categorical
+                            if cat in Xy1.columns
+                        ]
 
-                    X_y_list.append(c_X_y)
+                        X_pool = Pool(
+                            Xy1,
+                            cat_features=cat_idxs,
+                        )
 
-                t_X_y = pd.concat(X_y_list, axis=0)
-                if y in X_y.columns:
-                    X_y = X_y.drop([y], axis=1)
+                        y_pred = model.predict(X_pool, prediction_type="Class")
+                        # Xy1[y] = y_pred.ravel()
 
-                X_y = X_y.merge(t_X_y[["row_number", y]], on=["row_number"], how="left")
-                X_y = X_y.set_index(X_y["row_number"])
+                        X_y[X_y["cash_flow_item_code"] == item_col][y] = y_pred.ravel()
             else:
-                c_y_columns = [y]
+                # c_y_columns = [y]
+                # TODO: наверное, это если словарь
                 if self.strict_acc.get(y) is not None:
-                    X_y[y] = self.strict_acc[y][item_col]
+                    X_y[y] = self.strict_acc[y]
                 else:
-                    X = X_y[c_x_columns].to_numpy()
-
+                    X = X_y.copy()
                     model = field_models[y]
-                    y = model.predict(X)
-                    X_y[y] = y.ravel()
+                    if "pred_cash_flow_item_name" in X.columns:
+                        ymap = {
+                            x: i
+                            for i, x in enumerate(
+                                X["pred_cash_flow_item_name"].unique()
+                            )
+                        }
+                        # TODO: это в декодер
+                        X[f"{y}_norm"] = X["pred_cash_flow_item_name"].map(ymap)
+                    # to_drop = self.y_columns
+                    else:
+                        logging.error("No results for {y} from fasttext")
+                    X = X[[feat for feat in model.feature_names_]]
+                    cat_idxs = [
+                        X.columns.get_loc(key=cat)
+                        for cat in self.categorical
+                        if cat in X.columns
+                    ]
+
+                    X_pool = Pool(
+                        X,
+                        cat_features=cat_idxs,
+                    )
+                    if USE_DETAILED_LOG:
+                        logging.info(f"Feature names: {model.feature_names_}")
+
+                    predictions = model.predict(X_pool, prediction_type="Class")
+                    X_y[y] = predictions.ravel()
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))
 
-            c_x_columns = c_x_columns + c_y_columns
+            # c_x_columns = c_x_columns + c_y_columns
 
-        if self.need_to_encode:
-            X_y = pipeline.named_steps["data_encoder"].inverse_transform(X_y)
+        # if self.need_to_encode:
+        #     X_y = pipeline.named_steps["data_encoder"].inverse_transform(X_y)
 
         for y in self.y_columns:
             X_result[y] = X_y[y]
@@ -638,7 +696,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             j = min(i + batch_size, len(df))
             Xy = self.make_full(df=df, all_data=all_data, y=f"{y}", i=i, j=j)
             y_batch = Xy[f"{y}"]
-            # X_batch = Xy.drop([y for y in self.y_columns if y in Xy.columns], axis=1)
+            X_batch = Xy.drop([y for y in self.y_columns if y in Xy.columns], axis=1)
             X_batch = Xy.drop(to_drop, axis=1)
             pool = Pool(
                 X_batch,
@@ -776,66 +834,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
             datasets["train"] = dataset
 
         self.classes = {}
-        if need_to_initialize:
-            for y in self.y_columns:
-                self.classes[y] = list(datasets["train"][y].unique())
+        for y in self.y_columns:
+            self.classes[y] = list(datasets["train"][y].unique())
         gc.collect()
         return datasets
 
     async def _on_fitting_error(self, ex):
         self._delete_all_models()
         await super()._on_fitting_error(ex)
-
-    # def _save_column_model(self, column, item=None):
-    #     if not os.path.isdir(os.path.join(MODEL_FOLDER, self.uid, column)):
-    #         os.makedirs(os.path.join(MODEL_FOLDER, self.uid, column))
-
-    #     if item is not None:
-    #         if self.strict_acc.get(column) and self.strict_acc[column].get(item):
-    #             value = self.strict_acc[column][item]
-    #             with open(
-    #                 os.path.join(
-    #                     MODEL_FOLDER, self.uid, column, "{}.json".format(item)
-    #                 ),
-    #                 "w",
-    #             ) as fp:
-    #                 json.dump({"value": int(value)}, fp)
-    #         elif self.field_models.get(column) and self.field_models.get(column).get(
-    #             str(item)
-    #         ):
-    #             self._save_cb_model(self.field_models[column][str(item)], column, item)
-    #     else:
-    #         if self.strict_acc.get(column):
-    #             with open(
-    #                 os.path.join(MODEL_FOLDER, self.uid, column, "sum.json"), "w"
-    #             ) as fp:
-    #                 value = self.strict_acc[column]
-    #                 json.dump({"value": int(value)}, fp)
-    #         elif self.field_models.get(column):
-    #             self._save_cb_model(self.field_models[column], column)
-
-    # def _load_column_model(self, column, item=None):
-    #     if item is not None:
-    #         if os.path.exists(
-    #             os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-    #         ):
-    #             if not self.strict_acc.get(column):
-    #                 self.strict_acc[column] = {}
-    #             with open(
-    #                 os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-    #             ) as fp:
-    #                 self.strict_acc[column][item] = np.int64(json.load(fp)["value"])
-    #         elif os.path.exists(
-    #             os.path.join(MODEL_FOLDER, self.uid, column, "{}.cbm".format(item))
-    #         ):
-    #             self._load_cb_model(column, item)
-    #     else:
-    #         if os.path.exists(os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")):
-    #             with open(
-    #                 os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")
-    #             ) as fp:
-    #                 self.strict_acc[column] = np.int64(json.load(fp)["value"])
-    #         elif os.path.exists(
-    #             os.path.join(MODEL_FOLDER, self.uid, column, "sum.cbm")
-    #         ):
-    #             self._load_cb_model(column)

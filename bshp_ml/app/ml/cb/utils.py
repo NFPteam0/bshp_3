@@ -54,3 +54,18 @@ def get_none_data_row(self, parameters):
             row[col] = None
 
     return pd.DataFrame([row])
+
+
+def get_y_map(df: pd.DataFrame, y: list[str], mmap: dict | None = None) -> pd.DataFrame:
+    # TODO: записать в декодер
+    rows = []
+    if mmap is None:
+        mmap = {name: num for num, name in enumerate(df[y].unique())}
+    for item in df[y].unique():
+        ymap = dict()
+        ymap["value"] = item
+        ymap["code"] = df[[y, f"{y}_name"]].first()
+
+        ymap["norm"] = df[y].map(mmap)
+        rows.append(ymap)
+    return pd.DataFrame(rows)

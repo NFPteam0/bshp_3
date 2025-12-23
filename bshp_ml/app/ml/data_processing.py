@@ -6,9 +6,11 @@ import pandas as pd
 import json
 from datetime import datetime, timezone
 from pydantic import TypeAdapter, ValidationError
+
 # from pydantic_core import InitErrorDetails
 # from typing import List
 # from collections import defaultdict
+from .cb.utils import get_y_map
 
 from sklearn.base import BaseEstimator, TransformerMixin
 
@@ -232,7 +234,7 @@ class FeatureAdder(BaseEstimator, TransformerMixin):
             logger.info("Feature adding")
 
         for col in self.date_columns:
-            if X[col].dtype in ["string", "object"]:
+            if X[col].dtype in ["string", "object"] and col != "uploading_date":
                 X[col] = X[col].apply(str_to_date)
 
         X["document_year"] = X["date"].apply(self._get_year)

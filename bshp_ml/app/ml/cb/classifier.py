@@ -384,6 +384,11 @@ class CatBoostModel(Model):
 
     def _save_cb_model(self, model: CatBoostClassifier, column, item=None, number=None):
         path_to_model_folder = os.path.join(MODEL_FOLDER, self.uid, column)
+        if USE_DETAILED_LOG:
+            logger.info(
+                "Saving CB model in %s",
+                os.path.join(MODEL_FOLDER, self.uid, column),
+            )
         if item is not None:
             path_to_model = os.path.join(path_to_model_folder, "{}.cbm".format(item))
         elif number is not None:

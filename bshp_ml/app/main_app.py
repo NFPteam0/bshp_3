@@ -235,6 +235,7 @@ async def delete_data(
     return "Data has been deleted"
 
 
+# @app.post("v1/fit")
 @app.post("/fit")
 async def fit(
     background_tasks: BackgroundTasks,
@@ -320,6 +321,7 @@ async def get_model_info(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# @app.post("v1/predict")
 @app.post("/predict")
 async def predict(
     X: list[DataRow],

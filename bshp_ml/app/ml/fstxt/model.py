@@ -44,7 +44,7 @@ class FastTextModel(Model):
     def __init__(self, base_name: str):
         super().__init__(base_name)
         self.str_columns.extend(
-            ["cash_flow_item_name", "cash_flow_details_name", "payment_purpose"]
+            ["cash_flow_item_name", "cash_flow_details_name", "payment_purpose", "kind"]
         )
         self.y_columns = [
             "cash_flow_item_name",
@@ -156,11 +156,20 @@ class FastTextModel(Model):
         )
 
     async def predict(
-        self, X_api: dict | list[dict], for_metrics=False
+        self, X_api: dict | list[dict], for_metrics=False, set_classes: bool = False
     ) -> dict[str, EmbedPredictionsRow]:
         X = pd.DataFrame(X_api)
         # predict_detail
         # self.status != ModelStatuses.READY?
+        if set_classes:
+            self.all_classes_names = self.all_classes_names = {
+                col: X[col].unique() for col in self.y_columns
+            }
+            if USE_DETAILED_LOG:
+                logger.info(
+                    "Classes found: %s",
+                    str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
+                )
         if self.all_classes_names is None:
             raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 

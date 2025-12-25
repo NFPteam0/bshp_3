@@ -11,103 +11,146 @@ logger = logging.getLogger(__name__)
 
 
 class CBDataEncoder(BaseEstimator, TransformerMixin):
-    def __init__(self, parameters, for_predict=False):
+    def __init__(self, parameters, y_col: str, name_col: str = None):
         self.parameters = parameters
-        self.for_predict = for_predict
-        self.x_columns = self.parameters["x_columns"]
-        self.y_columns = self.parameters["y_columns"]
-        self.additional_columns = self.parameters["additional_columns"]
-        self.columns_to_encode = self.parameters["columns_to_encode"]
-        self.form_encode_dict = False
+
+        self.y = y_col
+        self.name_col = name_col
 
         self.df = pd.DataFrame(columns=["name", "code1c", "code_norm"])
-        self.encode_dict = {}
-        self.decode_dict = {}
 
-    def fit(self, X, y=None):
-        self.set_mapping(X, y)
-
+    def fit(self, X: pd.DataFrame, y=None):
         if USE_DETAILED_LOG:
             logger.info("Start encoding data, shape: %s", str(X.shape))
-            logger.info(
-                "Form encode dict for columns: %s",
-                ", ".join([col for col in X.columns if col in self.columns_to_encode]),
+
+        X = X.copy()
+
+        if self.y == "year":
+            uniq = X.drop_duplicates(subset=self.y).reset_index(drop=True)
+            uniq[f"{self.y}_norm"] = uniq.index.astype(int)
+            self.df = uniq.rename(
+                {self.y: "code1c", f"{self.y}_norm": "code_norm"}, axis=1
             )
-        if self.form_encode_dict:
-            for col in self.columns_to_encode:
-                uniq = list(X[col].unique())
 
-                uniq = [el for el in uniq if el]
+            self.code2norm = dict(zip(self.df["code1c"], self.df["code_norm"]))
+            self.norm2code = dict(zip(self.df["code_norm"], self.df["code1c"]))
+            return self
 
-                enc_dict = dict(zip(uniq, range(len(uniq))))
-                self.encode_dict[col] = enc_dict
+        self.set_mapping(X)
 
+        if USE_DETAILED_LOG:
+            logger.info("Len of classes: %s", str(X[self.y].unique()))
         return self
 
+    def set_mapping(self, X: pd.DataFrame) -> pd.DataFrame:
+        y = self.y
+        name = self.name_col
+
+        uniq = X[[y, name]].drop_duplicates().reset_index(drop=True)
+        uniq[f"{y}_norm"] = uniq.index.astype(int)
+
+        self.df = uniq.rename(
+            {y: "code1c", name: "name", f"{y}_norm": "code_norm"}, axis=1
+        )
+
+        self.code2norm = dict(zip(self.df["code1c"], self.df["code_norm"]))
+        self.norm2code = dict(zip(self.df["code_norm"], self.df["code1c"]))
+        self.code2name = dict(zip(self.df["code_norm"], self.df["name"]))
+        self.name2code = dict(zip(self.df["name"], self.df["code_norm"]))
+
     def transform(self, X):
+        X = X.copy()
         if USE_DETAILED_LOG:
             logger.info("Encoding, shape: %s", str(X.shape))
-        for col in self.columns_to_encode:
-            X[col] = X[col].apply(lambda x: self._get_encoded_field(x, col))
 
-        X = X[self.additional_columns + self.x_columns + self.y_columns]
-        if USE_DETAILED_LOG:
-            logger.info("Encoding data. Done. Shape: %s", str(X.shape))
+        # X[self.y] = X[self.y].apply(lambda x: self._get_encoded_field(x))
+        # X[f"pred_{self.y}_name"] = X[f"pred_{self.y}_name"].apply(
+        #     lambda x: self._get_encoded_field(x)
+        # )
+
+        # if USE_DETAILED_LOG:
+        #     logger.info("Encoding data. Done. Shape: %s", str(X.shape))
+        X[f"{self.y}_norm"] = X[self.y].map(self.code2norm).astype(int)
+        logger.info("Len of _norm classes: %s", len(X[f"{self.y}_norm"].unique()))
+        if self.name_col:
+            if USE_DETAILED_LOG:
+                logger.info(
+                    "Pre Encoded dict: %s, %s : %s",
+                    X[f"pred_{self.name_col}"].iloc[0],
+                    list(self.name2code.keys())[0],
+                    list(self.name2code.values())[0],
+                )
+                logger.info(
+                    "Len of pred_name classes: %s",
+                    str(X[f"pred_{self.name_col}"].unique()),
+                )
+
+            X[f"pred_{self.name_col}"] = (
+                X[f"pred_{self.name_col}"].map(self.name2code).fillna(-1).astype(int)
+            )
+            if USE_DETAILED_LOG:
+                logger.info(
+                    "Encoded dict: %s, %s, %s",
+                    X[f"pred_{self.name_col}"].iloc[0],
+                    list(self.name2code.keys())[0],
+                    list(self.name2code.values())[0],
+                )
+                logger.info(
+                    "Len of pred_name classes: %s",
+                    str(X[f"pred_{self.name_col}"].unique()),
+                )
         return X
 
     def inverse_transform(self, X):
-        if USE_DETAILED_LOG:
-            logger.info("Start decoding data. Shape: %s", str(X.shape))
-        self.decode_dict = {}
-        if self.form_encode_dict:
-            for col in self.encode_dict:
-                d = {v: k for k, v in self.encode_dict[col].items()}
-                self.decode_dict[col] = d
+        # if USE_DETAILED_LOG:
+        #     logger.info("Start decoding data. Shape: %s", str(X.shape))
 
-        for col in self.columns_to_encode:
-            X[col] = X[col].apply(lambda x: self._get_decoded_field(x, col))
+        # X[self.y] = X[self.y].apply(lambda x: self._get_decoded_field(x))
+        # X[f"pred_{self.y}_name"] = X[f"pred_{self.y}_name"].apply(
+        #     lambda x: self._get_decoded_field(x)
+        # )
+
+        # if USE_DETAILED_LOG:
+        #     logger.info("Decoding data. Done. Shape: %s", str(X.shape))
+        # return X
+
+        X = X.copy()
         if USE_DETAILED_LOG:
-            logger.info("Decoding data. Done. Shape: %s", str(X.shape))
+            logger.info("Encoding, shape: %s", str(X.shape))
+        X[self.y] = X[f"{self.y}_norm"].map(self.norm2code).fillna(-1)
+        if self.name_col:
+            # predicted name to corresponding label
+            X[f"pred_{self.name_col}"] = X[f"pred_{self.name_col}"].map(self.code2name)
         return X
 
-    def _get_decoded_field(self, value, field):
-        if value == -1:
-            return ""
-        else:
-            return self.decode_dict[field][value]
+    # def _get_decoded_field(self, norm_value):
+    #     if norm_value == -1:
+    #         return ""
+    #     else:
+    #         return self.df[self.df[norm_value] == self.df["code_norm"]]["code1c"].iloc[
+    #             0
+    #         ]
 
-    def _get_encoded_field(self, value, field):
-        if not value:
-            return -1
-        else:
-            return self.encode_dict[field][value]
+    # def _get_encoded_field(self, value):
+    #     if value not in self.df["code1c"]:
+    #         return -1
+    #     else:
+    #         return self.df[self.df[value] == self.df["code1c"]]["code_norm"].iloc[0]
 
-    def _get_month(self, date_value: datetime):
-        return date_value.month
+    # def _get_name(self, value):
+    #     if not value:
+    #         return ""
+    #     else:
+    #         return self.df[self.df[value] == self.df["code1c"]]["name"].iloc[0]
 
-    def _get_year(self, date_value: datetime):
-        return date_value.year
+    # def _get_month(self, date_value: datetime):
+    #     return date_value.month
 
-    def set_mapping(
-        self, X: pd.DataFrame, y: str, mmap: dict | None = None
-    ) -> pd.DataFrame:
-        rows = []
-        if mmap is None:
-            mmap = {name: num for num, name in enumerate(X[y].unique())}
-        for item in X[y].unique():
-            ymap = dict()
-            ymap["name"] = X[
-                [y, f"{y}_name"]
-            ].first()  # либо _name, либо _name_pred, если есть
-            ymap["code1c"] = item
-            ymap["code_norm"] = X[y].map(mmap)
-            rows.append(ymap)
-        self.df = pd.DataFrame(rows)
+    # def _get_year(self, date_value: datetime):
+    #     return date_value.year
 
-    def save(self, folder, name, encoder):
-        path_to_model = os.path.join(folder, name)
-        if not os.path.isdir(path_to_model):
-            os.makedirs(path_to_model)
-
-        with open(os.path.join(path_to_model, "encoder.pkl"), "wb") as fp:
-            pickle.dump(encoder, fp)
+    def save(self, folder, name="encoder"):
+        if not os.path.isdir(folder):
+            os.makedirs(folder)
+        with open(os.path.join(folder, f"{name}.pkl"), "wb") as fp:
+            pickle.dump(self, fp)

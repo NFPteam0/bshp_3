@@ -23,7 +23,7 @@ from settings import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v2", tags=["Новая cb"])
-
+# router = APIRouter()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
@@ -87,7 +87,7 @@ async def fit(
     try:
         fsttext = model_manager.get_model(ModelTypes.fstxt, "all_bases")
         # модель фасттекст для всех баз одна
-        Xy_embed = await fsttext.predict(X_y)
+        Xy_embed = await fsttext.predict(X_y, set_classes=True)
         Xy_json = json.loads(Xy_embed)
     except Exception as e:
         print(traceback.format_exc())

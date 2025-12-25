@@ -70,7 +70,7 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
 
         # if USE_DETAILED_LOG:
         #     logger.info("Encoding data. Done. Shape: %s", str(X.shape))
-        X[f"{self.y}_norm"] = X[self.y].map(self.code2norm).astype(int)
+        X[f"{self.y}_norm"] = X[self.y].map(self.code2norm).fillna(-1).astype(int)
         logger.info("Len of _norm classes: %s", len(X[f"{self.y}_norm"].unique()))
         if self.name_col:
             if USE_DETAILED_LOG:
@@ -82,7 +82,7 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                 )
                 logger.info(
                     "Len of pred_name classes: %s",
-                    str(X[f"pred_{self.name_col}"].unique()),
+                    len(X[f"pred_{self.name_col}"].unique()),
                 )
 
             X[f"pred_{self.name_col}"] = (
@@ -120,7 +120,9 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         X[self.y] = X[f"{self.y}_norm"].map(self.norm2code).fillna(-1)
         if self.name_col:
             # predicted name to corresponding label
-            X[f"pred_{self.name_col}"] = X[f"pred_{self.name_col}"].map(self.code2name)
+            X[f"pred_{self.name_col}"] = (
+                X[f"pred_{self.name_col}"].map(self.code2name).fillna(-1)
+            )
         return X
 
     # def _get_decoded_field(self, norm_value):

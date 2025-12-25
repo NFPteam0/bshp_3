@@ -484,8 +484,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
             )
             gc.collect()
             # self._save_cb_model(model, column=y, item=item)
-            # gc.collect()
             # self._load_all_models()
+        # self._load_all_models()
 
     async def fit(self, Xy_api: dict, parameters):
         X_y = pd.DataFrame(Xy_api)
@@ -588,7 +588,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             if y == "cash_flow_details_code":
                 cash_flow_items = list(X_y["cash_flow_item_code"].unique())
                 # X_y["row_number"] = row_numbers
-                X_y_list = []
+                # X_y_list = []
 
                 for ind, item_col in enumerate(cash_flow_items):
                     if USE_DETAILED_LOG:
@@ -603,10 +603,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         # No model nedeed
                         Xy1[y] = self.strict_acc[y][item_col]
                     else:
+                        # TODO: поправить, чтобы везде были либо инты, либо строки с 0ми
+                        encoder = self.field_encoders[y][int(item_col)]
+                        Xy1 = encoder.transform(Xy1)
                         model = field_models[y][str(item_col)]
 
-                        X = Xy1[self.x_columns].to_numpy()
                         Xy1 = Xy1[[feat for feat in model.feature_names_]]
+                        logger.info(
+                            "Features: %s",
+                            [(i, feat) for i, feat in enumerate(model.feature_names_)],
+                        )
                         cat_idxs = [
                             Xy1.columns.get_loc(key=cat)
                             for cat in self.categorical
@@ -619,29 +625,31 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         )
 
                         y_pred = model.predict(X_pool, prediction_type="Class")
-                        # Xy1[y] = y_pred.ravel()
-
-                        X_y[X_y["cash_flow_item_code"] == item_col][y] = y_pred.ravel()
+                        Xy1[f"{y}_norm"] = y_pred.ravel()
+                        Xy1 = encoder.inverse_transform(Xy1)
+                        X_y[X_y["cash_flow_item_code"] == item_col][y] = Xy1[y]
             else:
                 # c_y_columns = [y]
-                # TODO: наверное, это если словарь
                 if self.strict_acc.get(y) is not None:
                     X_y[y] = self.strict_acc[y]
                 else:
                     X = X_y.copy()
                     model = field_models[y]
-                    if "pred_cash_flow_item_name" in X.columns:
-                        ymap = {
-                            x: i
-                            for i, x in enumerate(
-                                X["pred_cash_flow_item_name"].unique()
-                            )
-                        }
-                        # TODO: это в декодер
-                        X[f"{y}_norm"] = X["pred_cash_flow_item_name"].map(ymap)
+                    logging.info("Encoders: %s", list(self.field_encoders.keys()))
+                    encoder = self.field_encoders[y]
+                    X = encoder.transform(X)
+                    # if "pred_cash_flow_item_name" in X.columns:
+                    # ymap = {
+                    #     x: i
+                    #     for i, x in enumerate(
+                    #         X["pred_cash_flow_item_name"].unique()
+                    #     )
+                    # }
+                    # # TODO: это в декодер
+                    # X[f"{y}_norm"] = X["pred_cash_flow_item_name"].map(ymap)
                     # to_drop = self.y_columns
-                    else:
-                        logging.error("No results for {y} from fasttext")
+                    # else:
+                    #     logging.error("No results for {y} from fasttext")
                     X = X[[feat for feat in model.feature_names_]]
                     cat_idxs = [
                         X.columns.get_loc(key=cat)
@@ -657,9 +665,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         logging.info(f"Feature names: {model.feature_names_}")
 
                     predictions = model.predict(X_pool, prediction_type="Class")
-                    X_y[y] = predictions.ravel()
+                    X_y[f"{y}_norm"] = predictions.ravel()
+                    X_y = encoder.inverse_transform(X_y)
+
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))
+                    logger.info("Predicted: %s", X_y[y])
 
             # c_x_columns = c_x_columns + c_y_columns
 
@@ -794,9 +805,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 self.field_models[column] = {}
             self.field_models[column][str(item)] = model
             self.field_encoders[column][str(item)] = encoder
+            logging.info("Encoder loaded: %s %s", column, str(item))
         else:
             self.field_encoders[column] = encoder
             self.field_models[column] = model
+            logging.info("Encoder loaded: %s", column)
 
     def _load_column_models(self, column, sum_model=False):
         folder = os.path.join(MODEL_FOLDER, self.uid, column)
@@ -804,31 +817,85 @@ class CatBoostModelEmbeddings(CatBoostModel):
             os.makedirs(folder)
         filenames = os.listdir(folder)
         models = {}
+        encoders = {}
 
         for filename in filenames:
             if filename == "sum.cbm" and not sum_model:
                 continue
             if filename != "sum.cbm" and sum_model:
                 continue
-
+            logging.info("Loading %s", filename)
             item = filename.split(".")[0]
             model = CatBoostClassifier()
             model.load_model(os.path.join(MODEL_FOLDER, self.uid, column, filename))
             models[item] = model
+            encoders[item] = self._load_cb_encoder(
+                os.path.join(MODEL_FOLDER, self.uid, column),
+                "encoder.pkl" if filename == "sum.cbm" else filename,
+            )
 
-        return models
+        return models, encoders
+
+    def _load_column_model(self, column, item=None):
+        col_path = os.path.join(MODEL_FOLDER, self.uid, column)
+
+        if item is not None:
+            if not self.field_encoders.get(column):
+                self.field_encoders[column] = {}
+
+            try:
+                self.field_encoders[column][item] = self._load_cb_encoder(
+                    col_path, f"{str(item).zfill(9)}.pkl"
+                )
+                item = str(item).zfill(9)
+            except FileNotFoundError:
+                self.field_encoders[column][item] = self._load_cb_encoder(
+                    col_path, f"{item}.pkl"
+                )
+            if os.path.exists(
+                os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
+            ):
+                if not self.strict_acc.get(column):
+                    self.strict_acc[column] = {}
+
+                with open(
+                    os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
+                ) as fp:
+                    self.strict_acc[column][item] = np.int64(json.load(fp)["value"])
+            elif os.path.exists(
+                os.path.join(MODEL_FOLDER, self.uid, column, "{}.cbm".format(item))
+            ):
+                self._load_cb_model(column, item)
+        else:
+            if not self.field_encoders.get(column):
+                self.field_encoders[column] = {}
+
+            self.field_encoders[column][item] = self._load_cb_encoder(col_path)
+
+            if os.path.exists(os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")):
+                with open(
+                    os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")
+                ) as fp:
+                    self.strict_acc[column] = np.int64(json.load(fp)["value"])
+            elif os.path.exists(
+                os.path.join(MODEL_FOLDER, self.uid, column, "sum.cbm")
+            ):
+                self._load_cb_model(column)
 
     def _load_all_models(self):
         for y in self.y_columns:
-            models = self._load_column_models(
+            models, encoders = self._load_column_models(
                 y, sum_model=y != "cash_flow_details_code"
             )
+            logger.info("Encoders: %s", encoders)
             if models:
                 if y != "cash_flow_details_code":
                     self.field_models[y] = list(models.values())[0]
+                    self.field_encoders[y] = list(encoders.values())[0]
                 else:
                     for item, model in models.items():
                         self.field_models[y][item] = model
+                        self.field_encoders[y][item] = encoders[item]
 
     def _delete_submodels(self, column):
         path_to_dir = os.path.join(MODEL_FOLDER, self.uid, column)
@@ -936,37 +1003,19 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 )
             encoder = self.field_encoders[column][str(item)]
             encoder.save(col_path, str(item))
-        elif self.field_models.get(column):
+        elif self.field_encoders.get(column):
             encoder = self.field_encoders[column]
             encoder.save(col_path)
 
-    # def _load_column_model(self, column, item=None):
-    #     if item is not None:
-    #         if os.path.exists(
-    #             os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-    #         ):
-    #             if not self.strict_acc.get(column):
-    #                 self.strict_acc[column] = {}
-    #             with open(
-    #                 os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-    #             ) as fp:
-    #                 self.strict_acc[column][item] = np.int64(json.load(fp)["value"])
-    #         elif os.path.exists(
-    #             os.path.join(MODEL_FOLDER, self.uid, column, "{}.cbm".format(item))
-    #         ):
-    #             self._load_cb_model(column, item)
-    #     else:
-    #         if os.path.exists(os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")):
-    #             with open(
-    #                 os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")
-    #             ) as fp:
-    #                 self.strict_acc[column] = np.int64(json.load(fp)["value"])
-    #         elif os.path.exists(
-    #             os.path.join(MODEL_FOLDER, self.uid, column, "sum.cbm")
-    #         ):
-    #             self._load_cb_model(column)
-
-    def _load_cb_encoder(self, path, name="encoder.pkl"):
+    def _load_cb_encoder(self, path, name="encoder.pkl") -> CBDataEncoder:
         if os.path.exists(path):
             with open(os.path.join(path, name), "rb") as fp:
-                self.data_encoder = pickle.load(fp)
+                return pickle.load(fp)
+
+    def _load_encoder(self):
+        pass
+        # if self.need_to_encode:
+        #     path_to_model = os.path.join(MODEL_FOLDER, self.uid)
+        #     if os.path.exists(path_to_model):
+        #         with open(os.path.join(path_to_model, "encoder.pkl"), "rb") as fp:
+        #             self.data_encoder = pickle.load(fp)

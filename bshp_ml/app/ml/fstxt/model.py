@@ -158,6 +158,19 @@ class FastTextModel(Model):
         self, X_api: dict | list[dict], for_metrics=False, set_classes: bool = False
     ) -> dict[str, EmbedPredictionsRow]:
         X = pd.DataFrame(X_api)
+        if USE_DETAILED_LOG:
+            logger.info("Transforming and checking data")
+
+        for col in ["cash_flow_item_name", "cash_flow_details_name"]:
+            if col not in X.columns:
+                X[col] = ""
+
+        pipeline_list = []
+        pipeline_list.append(("checker", Checker(self.parameters)))
+        pipeline_list.append(("nan_processor", NanProcessor(self.parameters)))
+
+        pipeline = Pipeline(pipeline_list)
+        X = pipeline.fit_transform(X)
         # predict_detail
         # self.status != ModelStatuses.READY?
         if set_classes:
@@ -202,6 +215,7 @@ class FastTextModel(Model):
                 logging.info("Predicting %s", y)
                 logging.info("Overall classes %d", len(self.all_classes_names[y]))
                 logging.info("Feed model with %d txt columns", len(X.columns))
+                logging.info("Feed model with %s: ", all_classes_names[y])
             wordvec = {cls: self._model.wv[cls] for cls in all_classes_names}
             vectors = np.vstack(list(wordvec.values()))
             words = list(wordvec.keys())

@@ -80,6 +80,8 @@ async def fit(
         X_y = await _read_dataset({"data_filter": {"base_name": base_name}})
         if USE_DETAILED_LOG:
             logging.info("Loading columns: %s, %s", X_y.columns, X_y.shape)
+        if X_y.empty:
+            raise ValueError
     except Exception as e:
         print(traceback.format_exc())
         logger.error(

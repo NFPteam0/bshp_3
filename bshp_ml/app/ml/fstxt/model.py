@@ -161,9 +161,7 @@ class FastTextModel(Model):
         # predict_detail
         # self.status != ModelStatuses.READY?
         if set_classes:
-            self.all_classes_names = self.all_classes_names = {
-                col: X[col].unique() for col in self.y_columns
-            }
+            self.all_classes_names = {col: X[col].unique() for col in self.y_columns}
             if USE_DETAILED_LOG:
                 logger.info(
                     "Classes found: %s",

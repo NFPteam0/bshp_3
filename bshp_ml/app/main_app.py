@@ -235,8 +235,8 @@ async def delete_data(
     return "Data has been deleted"
 
 
-@app.post("v1/fit")
 # @app.post("/fit")
+@app.post("/v1/fit")
 async def fit(
     background_tasks: BackgroundTasks,
     token: str = Depends(get_token_from_header),
@@ -321,8 +321,8 @@ async def get_model_info(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("v1/predict")
 # @app.post("/predict")
+@app.post("/v1/predict")
 async def predict(
     X: list[DataRow],
     base_name: str = Query(default=""),

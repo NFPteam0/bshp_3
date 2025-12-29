@@ -337,7 +337,7 @@ async def predict(
         X_list = []
         for row in X:
             X_list.append(row.model_dump())
-        model = model_manager.get_model(model_type, base_name)
+        model = model_manager.get_model(model_type, base_name, log=False)
         result = []
         X_y_list = await model.predict(X_list)
         for row in X_y_list:

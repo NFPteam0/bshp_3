@@ -76,10 +76,9 @@ class FastTextModel(Model):
                     "Classes found: %s",
                     str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
                 )
-            except Exception as e:
+            except KeyError as e:
                 # TODO: другой эксцепт
-                logger.error("No classes for embeddings detected")
-                raise ValueError(f"No classes for embeddings detected due to: {e}")
+                logger.warning("No classes for embeddings detected: {e}")
 
             self._load_pretrained()
 

@@ -308,6 +308,7 @@ async def get_model_info(
     model_manager=Depends(get_model_manager),
 ) -> ModelInfo:
     try:
+        model_type = ModelTypes.catboost_txt
         if not base_name:
             base_name = "all_bases"
         result = await model_manager.get_info(

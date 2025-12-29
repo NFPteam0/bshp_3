@@ -173,10 +173,12 @@ async def save_data(
     authenticated: bool = Depends(check_token),
     replace: bool = Query(default=False),
 ) -> TaskResponse:
-    logger.info(f"Starting uploading from file: {file.filename}")
+    logger.info(
+        f"Starting uploading from file: {file.filename},\n will be available with base_name = {base_name}"
+    )
 
     task_id = str(uuid.uuid4())
-    task = await task_manager.create_task(task_id)
+    # task = await task_manager.create_task(task_id)
 
     try:
         # Save file

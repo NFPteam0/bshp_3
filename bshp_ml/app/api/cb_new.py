@@ -22,8 +22,8 @@ from settings import (
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/v2", tags=["Новая cb"])
-# router = APIRouter()
+# router = APIRouter(prefix="/v2", tags=["Новая cb"])
+router = APIRouter()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",

@@ -1041,8 +1041,30 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
     def _load_encoder(self):
         pass
-        # if self.need_to_encode:
-        #     path_to_model = os.path.join(MODEL_FOLDER, self.uid)
-        #     if os.path.exists(path_to_model):
-        #         with open(os.path.join(path_to_model, "encoder.pkl"), "rb") as fp:
-        #             self.data_encoder = pickle.load(fp)
+
+
+# class CbCallBack:
+#     def after_iteration(self, info):
+#         if USE_DETAILED_LOG:
+#             if info.metrics.get("validation"):
+#                 logger.info(
+#                     "{}: - loss = {}, test loss = {}".format(
+#                         info.iteration,
+#                         info.metrics["learn"][list(info.metrics["learn"].keys())[0]][
+#                             -1
+#                         ],
+#                         info.metrics["validation"][
+#                             list(info.metrics["validation"].keys())[0]
+#                         ][-1],
+#                     )
+#                 )
+#             else:
+#                 logger.info(
+#                     "{}: - loss = {}".format(
+#                         info.iteration,
+#                         info.metrics["learn"][list(info.metrics["learn"].keys())[0]][
+#                             -1
+#                         ],
+#                     )
+#                 )
+#         return True

@@ -131,10 +131,9 @@ async def process_fitting_model_v2(
         if data_filter:
             parameters["data_filter"].update(data_filter)
 
-        await model.fit(Xy_api=Xy_api, parameters=parameters)
-
-        logger.info("Start writing model to db")
         try:
+            await model.fit(Xy_api=Xy_api, parameters=parameters)
+            logger.info("Start writing model to db")
             await model_manager.write_model(model)
         except Exception as e:
             model.status = ModelStatuses.ERROR

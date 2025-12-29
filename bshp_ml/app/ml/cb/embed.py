@@ -953,9 +953,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         pipeline = Pipeline(pipeline_list)
         dataset = pipeline.fit_transform(dataset)
+
         self.classes = {}
 
         for y in self.y_columns:
+            dataset = dataset[y].replace("", -1)
             if y == "cash_flow_details_code":
                 self.classes[y] = {}
                 for item in dataset["cash_flow_item_code"].unique():

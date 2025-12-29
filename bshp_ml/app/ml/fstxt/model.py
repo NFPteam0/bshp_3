@@ -215,7 +215,7 @@ class FastTextModel(Model):
                 logging.info("Predicting %s", y)
                 logging.info("Overall classes %d", len(self.all_classes_names[y]))
                 logging.info("Feed model with %d txt columns", len(X.columns))
-                logging.info("Feed model with %s: ", all_classes_names[y])
+                logging.info("Feed model with %s: ", all_classes_names)
             wordvec = {cls: self._model.wv[cls] for cls in all_classes_names}
             vectors = np.vstack(list(wordvec.values()))
             words = list(wordvec.keys())

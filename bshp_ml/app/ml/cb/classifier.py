@@ -511,7 +511,11 @@ class CatBoostModel(Model):
             os.makedirs(os.path.join(MODEL_FOLDER, self.uid, column))
 
         if item is not None:
-            if self.strict_acc.get(column) and self.strict_acc[column].get(item):
+            item = int(item)
+            if (
+                self.strict_acc.get(column) is not None
+                and self.strict_acc[column].get(item) is not None
+            ):
                 value = self.strict_acc[column][item]
                 with open(
                     os.path.join(
@@ -520,26 +524,31 @@ class CatBoostModel(Model):
                     "w",
                 ) as fp:
                     json.dump({"value": int(value)}, fp)
-            elif self.field_models.get(column) and self.field_models.get(column).get(
-                str(item)
+            elif (
+                self.field_models.get(column) is not None
+                and self.field_models.get(column).get(item) is not None
             ):
-                self._save_cb_model(self.field_models[column][str(item)], column, item)
+                self._save_cb_model(self.field_models[column][item], column, item)
         else:
-            if self.strict_acc.get(column):
+            if (
+                self.strict_acc.get(column) is not None
+                and len(self.strict_acc.get(column)) > 0
+            ):
                 with open(
                     os.path.join(MODEL_FOLDER, self.uid, column, "sum.json"), "w"
                 ) as fp:
                     value = self.strict_acc[column]
                     json.dump({"value": int(value)}, fp)
-            elif self.field_models.get(column):
+            elif self.field_models.get(column) is not None:
                 self._save_cb_model(self.field_models[column], column)
 
     def _load_column_model(self, column, item=None):
         if item is not None:
+            item = int(item)
             if os.path.exists(
                 os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
             ):
-                if not self.strict_acc.get(column):
+                if self.strict_acc.get(column) is None:
                     self.strict_acc[column] = {}
                 with open(
                     os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))

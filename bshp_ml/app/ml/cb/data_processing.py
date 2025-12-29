@@ -24,42 +24,54 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             logger.info("Start encoding data, shape: %s", str(X.shape))
 
         X = X.copy()
+        X[self.y] = X[self.y].astype(int)
+        # if self.y == "year":
+        #     uniq = X.drop_duplicates(subset=self.y).reset_index(drop=True)
+        #     uniq[f"{self.y}_norm"] = uniq.index.astype(int)
+        #     self.df = uniq.rename(
+        #         {self.y: "code1c", f"{self.y}_norm": "code_norm"}, axis=1
+        #     )
 
-        if self.y == "year":
-            uniq = X.drop_duplicates(subset=self.y).reset_index(drop=True)
-            uniq[f"{self.y}_norm"] = uniq.index.astype(int)
-            self.df = uniq.rename(
-                {self.y: "code1c", f"{self.y}_norm": "code_norm"}, axis=1
-            )
-
-            self.code2norm = dict(zip(self.df["code1c"], self.df["code_norm"]))
-            self.norm2code = dict(zip(self.df["code_norm"], self.df["code1c"]))
-            return self
+        #     self.code2norm = dict(
+        #         zip(self.df["code1c"].astype(int), self.df["code_norm"].astype(int))
+        #     )
+        #     self.norm2code = dict(
+        #         zip(self.df["code_norm"].astype(int), self.df["code1c"].astype(int))
+        #     )
+        #     return self
 
         self.set_mapping(X)
 
         if USE_DETAILED_LOG:
-            logger.info("Len of classes: %s", str(X[self.y].unique()))
+            logger.info("Len of classes: %s", len(X[self.y].unique()))
         return self
 
     def set_mapping(self, X: pd.DataFrame) -> pd.DataFrame:
         y = self.y
         name = self.name_col
+        if name == y:
+            uniq = X[[y]].drop_duplicates(keep="first").reset_index(drop=True).copy()
+            uniq["name"] = uniq[y]
+            uniq[f"{y}_norm"] = uniq.index.astype(int)
 
-        uniq = X[[y, name]].drop_duplicates().reset_index(drop=True)
-        uniq[f"{y}_norm"] = uniq.index.astype(int)
+            self.df = uniq.rename({y: "code1c", f"{y}_norm": "code_norm"}, axis=1)
+        else:
+            uniq = X[[y, name]].drop_duplicates(keep="first").reset_index(drop=True)
+            uniq[f"{y}_norm"] = uniq.index.astype(int)
 
-        self.df = uniq.rename(
-            {y: "code1c", name: "name", f"{y}_norm": "code_norm"}, axis=1
-        )
+            self.df = uniq.rename(
+                {y: "code1c", name: "name", f"{y}_norm": "code_norm"}, axis=1
+            )
 
-        self.code2norm = dict(zip(self.df["code1c"], self.df["code_norm"]))
-        self.norm2code = dict(zip(self.df["code_norm"], self.df["code1c"]))
+        self.code2norm = dict(zip(self.df["code1c"].astype(int), self.df["code_norm"]))
+        self.norm2code = dict(zip(self.df["code_norm"], self.df["code1c"].astype(int)))
         self.code2name = dict(zip(self.df["code_norm"], self.df["name"]))
         self.name2code = dict(zip(self.df["name"], self.df["code_norm"]))
 
     def transform(self, X):
         X = X.copy()
+        X[self.y] = X[self.y].replace("", -1).astype(int)
+
         if USE_DETAILED_LOG:
             logger.info("Encoding, shape: %s", str(X.shape))
 
@@ -85,8 +97,8 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                     len(X[f"pred_{self.name_col}"].unique()),
                 )
 
-            X[f"pred_{self.name_col}"] = (
-                X[f"pred_{self.name_col}"].map(self.name2code).fillna(-1).astype(int)
+            X[f"pred_{self.name_col}"] = X[f"pred_{self.name_col}"].replace(
+                self.name2code
             )
             if USE_DETAILED_LOG:
                 logger.info(
@@ -97,8 +109,9 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                 )
                 logger.info(
                     "Len of pred_name classes: %s",
-                    str(X[f"pred_{self.name_col}"].unique()),
+                    len(X[f"pred_{self.name_col}"].unique()),
                 )
+        X[self.y] = X[self.y].replace("", None).fillna(-1).astype(int)
         return X
 
     def inverse_transform(self, X):
@@ -115,14 +128,16 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         # return X
 
         X = X.copy()
+        if self.name_col != "year":
+            # predicted name to corresponding label
+            X[f"{self.name_col}"] = X[f"{self.y}_norm"].map(self.code2name).fillna("")
+
+            # X[self.y] = X[X[self.y] == -1][f"pred_{self.name_col}"].map(self.name2code)
+            # X[self.name_col] = X[f"pred_{self.name_col}"]
         if USE_DETAILED_LOG:
             logger.info("Encoding, shape: %s", str(X.shape))
         X[self.y] = X[f"{self.y}_norm"].map(self.norm2code).fillna(-1)
-        if self.name_col:
-            # predicted name to corresponding label
-            X[f"pred_{self.name_col}"] = (
-                X[f"pred_{self.name_col}"].map(self.code2name).fillna(-1)
-            )
+
         return X
 
     # def _get_decoded_field(self, norm_value):

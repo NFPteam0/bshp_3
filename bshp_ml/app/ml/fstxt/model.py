@@ -179,7 +179,6 @@ class FastTextModel(Model):
         # y = self._model.predict(X)
         # X_y[y_col] = y.ravel()
         # details cols
-        # TODO: в numpy массивы - будет быстрее?
         tmp_cols = []
         all_sentences = prepare_sentences(X, self.str_columns + tmp_cols)
         sentences = all_sentences
@@ -190,7 +189,7 @@ class FastTextModel(Model):
             if y == "cash_flow_details_name":
                 # result.get("cash_flow_item_name")
                 tmp_cols.append("pred_cash_flow_item_name")
-                # TODO: долго
+
                 if "pred_cash_flow_item_name" in X.columns:
                     sentences_i = prepare_sentences(X, tmp_cols)
                 else:
@@ -211,12 +210,11 @@ class FastTextModel(Model):
             words = list(wordvec.keys())
             # TODO: add validation?
             for sentence in sentences:
-                # Получение вектора и вычисление схожести
                 # target_vector = self.sentence_vector(sentence, self._model.wv)
                 target_vector = self.sentence_vector_cached(
                     tuple(sentence), self.base_name, self.model_type
                 )
-                # Вычисление косинусной схожести и поиск максимума за один проход
+
                 similarities = self._model.wv.cosine_similarities(
                     target_vector, vectors
                 )

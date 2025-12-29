@@ -141,7 +141,13 @@ class FeatureAdder(BaseEstimator, TransformerMixin):
 
         for col in self.date_columns:
             if X[col].dtype in ["string", "object"] and col != "uploading_date":
-                X[col] = X[col].apply(str_to_date)
+                # X[col] = X[col].apply(str_to_date)
+                X[col] = pd.to_datetime(
+                    X[col],
+                    format="mixed",
+                    errors="coerce",
+                    dayfirst=True,
+                ).fillna(pd.Timestamp("1970-01-01"))
 
         X["document_year"] = X["date"].apply(self._get_year)
         X["document_month"] = X["date"].apply(self._get_month)

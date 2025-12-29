@@ -202,7 +202,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
-                #   300,
+                300,
                 #   400,
             ],
             "l2_leaf_reg": [4],
@@ -281,7 +281,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         if y == "cash_flow_details_code":
             self.field_models[y] = {}
-            self.field_encoders[str(y)] = {}
+            self.field_encoders[y] = {}
             for item in df["cash_flow_item_code"].unique():
                 # model = None
                 if USE_DETAILED_LOG:
@@ -302,8 +302,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     name_col="cash_flow_details_name",
                 )
                 df_i = encoder.fit_transform(df_i, None)
-                encoder.save(os.path.join(MODEL_FOLDER, self.uid, y), item)
-                self.field_encoders[y][str(item)] = encoder
+                encoder.save(os.path.join(MODEL_FOLDER, self.uid, y), int(item))
+                self.field_encoders[y][int(item)] = encoder
 
                 to_drop = [y for y in to_drop if y in df_i.columns]
                 to_drop.extend(
@@ -330,7 +330,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     bscores.extend([1 for _ in range(len(df_i[f"{y}_norm"]))])
                     print("Only one details code, no need for model")
                     # TODO: сохранить словарь
-                    self.strict_acc[y][item] = this_label
+                    self.strict_acc[y][int(item)] = this_label
                     continue
 
                 # X, y train
@@ -379,9 +379,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     trees=parameters.get("trees", 30),
                     all_data=all_data,
                 )
-                self.field_models[y][item] = model_i
+                self.field_models[y][int(item)] = model_i
                 # TODO: check
-                self._save_cb_model(model_i, column=y, item=item)
+                self._save_cb_model(model_i, column=y, item=int(item))
 
         else:
             if USE_DETAILED_LOG:
@@ -393,7 +393,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
             encoder = CBDataEncoder(
                 parameters=self.parameters,
                 y_col=y,
-                name_col="cash_flow_item_name" if y == "cash_flow_item_code" else None,
+                name_col="cash_flow_item_name"
+                if y == "cash_flow_item_code"
+                else "year",
             )
             df = encoder.fit_transform(df, None)
             encoder.save(os.path.join(MODEL_FOLDER, self.uid, y))
@@ -429,6 +431,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # ]
                 # (f"Only one {y} code, no need for model")
                 self.strict_acc[y] = this_label
+                return
             # X, y train
             df_test = df.sample(frac=0.05, random_state=SEED)
             df_train = df.drop(df_test.index)
@@ -586,7 +589,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             if USE_DETAILED_LOG:
                 logger.info('Start predicting. Field = "{}"'.format(y))
             if y == "cash_flow_details_code":
-                cash_flow_items = list(X_y["cash_flow_item_code"].unique())
+                cash_flow_items = list(X_y["cash_flow_item_code"].unique().astype(int))
                 # X_y["row_number"] = row_numbers
                 # X_y_list = []
 
@@ -596,18 +599,26 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                     Xy1 = X_y.loc[X_y["cash_flow_item_code"] == item_col].copy()
 
+                    encoder = self.field_encoders[y].get(int(item_col))
+                    if encoder is None:
+                        continue
+                    Xy1 = encoder.transform(Xy1)
+
                     if (
                         self.strict_acc.get(y) is not None
-                        and self.strict_acc[y].get(item_col) is not None
+                        and self.strict_acc[y].get(int(item_col)) is not None
                     ):
                         # No model nedeed
-                        Xy1[y] = self.strict_acc[y][item_col]
+                        Xy1[y] = self.strict_acc[y][int(item_col)]
                     else:
                         # TODO: поправить, чтобы везде были либо инты, либо строки с 0ми
-                        encoder = self.field_encoders[y][int(item_col)]
-                        Xy1 = encoder.transform(Xy1)
-                        model = field_models[y][str(item_col)]
+                        # encoder = self.field_encoders[y].get(int(item_col))
+                        # if encoder is None:
+                        #     continue
+                        # Xy1 = encoder.transform(Xy1)
+                        # model = field_models[y][int(item_col)]
 
+                        model = field_models[y][int(item_col)]
                         Xy1 = Xy1[[feat for feat in model.feature_names_]]
                         logger.info(
                             "Features: %s",
@@ -626,11 +637,18 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                         y_pred = model.predict(X_pool, prediction_type="Class")
                         Xy1[f"{y}_norm"] = y_pred.ravel()
-                        Xy1 = encoder.inverse_transform(Xy1)
-                        X_y[X_y["cash_flow_item_code"] == item_col][y] = Xy1[y]
+                    Xy1 = encoder.inverse_transform(Xy1)
+                    # X_y[X_y["cash_flow_item_code"] == item_col][y] = Xy1[y]
+
+                    mask = X_y["cash_flow_item_code"] == item_col
+                    X_y.loc[mask, Xy1.columns] = Xy1.values
+                    # X_y[X_y["cash_flow_item_code"] == item_col][y] = Xy1[y]
             else:
                 # c_y_columns = [y]
-                if self.strict_acc.get(y) is not None:
+                if (
+                    self.strict_acc.get(y) is not None
+                    and len(self.strict_acc.get(y)) != 0
+                ):
                     X_y[y] = self.strict_acc[y]
                 else:
                     X = X_y.copy()
@@ -673,17 +691,17 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     logger.info("Predicted: %s", X_y[y])
 
             # c_x_columns = c_x_columns + c_y_columns
-
+        return X_y.to_dict(orient="records")
         # if self.need_to_encode:
         #     X_y = pipeline.named_steps["data_encoder"].inverse_transform(X_y)
 
-        for y in self.y_columns:
-            X_result[y] = X_y[y]
+        # for y in self.y_columns:
+        #     X_result[y] = X_y[y]
 
-        if for_metrics:
-            return X_result
-        else:
-            return X_result.to_dict(orient="records")
+        # if for_metrics:
+        #     return X_result
+        # else:
+        #     return X_result.to_dict(orient="records")
 
     def _get_cb_model(self, parameters):
         epochs = parameters.get("epochs", 20)
@@ -803,8 +821,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
         if item is not None:
             if not self.field_models.get(column):
                 self.field_models[column] = {}
-            self.field_models[column][str(item)] = model
-            self.field_encoders[column][str(item)] = encoder
+            self.field_models[column][int(item)] = model
+            self.field_encoders[column][int(item)] = encoder
             logging.info("Encoder loaded: %s %s", column, str(item))
         else:
             self.field_encoders[column] = encoder
@@ -840,18 +858,19 @@ class CatBoostModelEmbeddings(CatBoostModel):
         col_path = os.path.join(MODEL_FOLDER, self.uid, column)
 
         if item is not None:
+            item = int(item)
             if not self.field_encoders.get(column):
                 self.field_encoders[column] = {}
+            self.field_encoders[column][item] = self._load_cb_encoder(
+                col_path, f"{item}.pkl"
+            )
+            # try:
+            #     self.field_encoders[column][item] = self._load_cb_encoder(
+            #         col_path, f"{str(item).zfill(9)}.pkl"
+            #     )
+            #     item = str(item).zfill(9)
+            # except FileNotFoundError:
 
-            try:
-                self.field_encoders[column][item] = self._load_cb_encoder(
-                    col_path, f"{str(item).zfill(9)}.pkl"
-                )
-                item = str(item).zfill(9)
-            except FileNotFoundError:
-                self.field_encoders[column][item] = self._load_cb_encoder(
-                    col_path, f"{item}.pkl"
-                )
             if os.path.exists(
                 os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
             ):
@@ -861,16 +880,18 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 with open(
                     os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
                 ) as fp:
-                    self.strict_acc[column][item] = np.int64(json.load(fp)["value"])
+                    self.strict_acc[column][int(item)] = np.int64(
+                        json.load(fp)["value"]
+                    )
             elif os.path.exists(
                 os.path.join(MODEL_FOLDER, self.uid, column, "{}.cbm".format(item))
             ):
-                self._load_cb_model(column, item)
+                self._load_cb_model(column, int(item))
         else:
             if not self.field_encoders.get(column):
                 self.field_encoders[column] = {}
 
-            self.field_encoders[column][item] = self._load_cb_encoder(col_path)
+            self.field_encoders[column] = self._load_cb_encoder(col_path)
 
             if os.path.exists(os.path.join(MODEL_FOLDER, self.uid, column, "sum.json")):
                 with open(
@@ -894,8 +915,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     self.field_encoders[y] = list(encoders.values())[0]
                 else:
                     for item, model in models.items():
-                        self.field_models[y][item] = model
-                        self.field_encoders[y][item] = encoders[item]
+                        self.field_models[y][int(item)] = model
+                        self.field_encoders[y][int(item)] = encoders[item]
 
     def _delete_submodels(self, column):
         path_to_dir = os.path.join(MODEL_FOLDER, self.uid, column)
@@ -938,11 +959,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
             if y == "cash_flow_details_code":
                 self.classes[y] = {}
                 for item in dataset["cash_flow_item_code"].unique():
-                    self.classes[y][str(item)] = list(
-                        dataset[dataset["cash_flow_item_code"] == item][y].unique()
+                    self.classes[y][int(item)] = list(
+                        dataset[dataset["cash_flow_item_code"] == int(item)][y]
+                        .unique()
+                        .astype(int)
                     )
             else:
-                self.classes[y] = list(dataset[y].unique())
+                self.classes[y] = list(dataset[y].unique().astype(int))
         datasets = {}
 
         if train_test_indexes:
@@ -983,8 +1006,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     os.makedirs(path_to_col)
                 if y_col == "cash_flow_details_code":
                     for item in self.classes[y_col]:
-                        self._save_column_model(y_col, item)
-                        self._save_field_encoder(y_col, item)
+                        self._save_column_model(y_col, int(item))
+                        self._save_field_encoder(y_col, int(item))
                 else:
                     self._save_column_model(y_col)
                     self._save_field_encoder(y_col)
@@ -996,13 +1019,14 @@ class CatBoostModelEmbeddings(CatBoostModel):
         col_path = os.path.join(MODEL_FOLDER, self.uid, column)
 
         if item is not None:
+            item = int(item)
             if not hasattr(self.field_encoders[column], "item"):
                 logging.warning(f"No item {item} in {list(self.field_encoders.keys())}")
                 logging.warning(
-                    f"No item {item} in {[v[str(item)].df for k, v in self.field_encoders.items() if isinstance(v, dict)]}"
+                    f"No item {item} in {[v[item].df for k, v in self.field_encoders.items() if isinstance(v, dict)]}"
                 )
-            encoder = self.field_encoders[column][str(item)]
-            encoder.save(col_path, str(item))
+            encoder = self.field_encoders[column][item]
+            encoder.save(col_path, item)
         elif self.field_encoders.get(column):
             encoder = self.field_encoders[column]
             encoder.save(col_path)

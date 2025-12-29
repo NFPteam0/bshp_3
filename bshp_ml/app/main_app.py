@@ -314,10 +314,6 @@ async def get_model_info(
         result = await model_manager.get_info(
             model_type=model_type.value, base_name=base_name
         )
-        base_name = "all_bases"
-        result = await model_manager.get_info(
-            model_type=model_type.value, base_name=base_name
-        )
         return ModelInfo.model_validate(result)
     except Exception as e:
         logger.error(f"Error getting model info: {e}")

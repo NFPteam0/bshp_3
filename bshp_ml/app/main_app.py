@@ -178,7 +178,7 @@ async def save_data(
     )
 
     task_id = str(uuid.uuid4())
-    # task = await task_manager.create_task(task_id)
+    task = await task_manager.create_task(task_id)
 
     try:
         # Save file

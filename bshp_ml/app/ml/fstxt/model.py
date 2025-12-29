@@ -44,7 +44,13 @@ class FastTextModel(Model):
     def __init__(self, base_name: str):
         super().__init__(base_name)
         self.str_columns.extend(
-            ["cash_flow_item_name", "cash_flow_details_name", "payment_purpose", "kind"]
+            [
+                "cash_flow_item_name",
+                "cash_flow_details_name",
+                "payment_purpose",
+                "kind",
+                "payment_purpose_returned",
+            ]
         )
         self.y_columns = [
             "cash_flow_item_name",

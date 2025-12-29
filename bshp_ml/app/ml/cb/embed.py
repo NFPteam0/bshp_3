@@ -92,6 +92,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 "base_document_number",
                 "article_document_number",
                 "article_code",
+                "payment_purpose_returned",
             ]
         )
         self.x_columns.extend(

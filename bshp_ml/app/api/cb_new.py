@@ -1,7 +1,16 @@
 import logging
 import traceback
+from typing import Optional
 import uuid
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Header,
+    Query,
+)
 import pandas as pd
 from ml.models import Model
 from schemas.models import DataRow, ExtDataRow, ModelTypes, EmbedPredictionsRow
@@ -30,10 +39,14 @@ logging.basicConfig(
 )
 
 
+async def get_token_from_header(token: Optional[str] = Header(None, alias="token")):
+    return token
+
+
 @router.post("/fit")
 async def fit(
     background_tasks: BackgroundTasks,
-    # token: str = Depends(get_token_from_header),
+    token: str = Depends(get_token_from_header),
     # authenticated: bool = Depends(check_token),
     base_name: str = Query(default=""),
     parameters: dict = Body(),

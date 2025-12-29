@@ -45,6 +45,7 @@ async def fit(
 ):
     if not base_name:
         base_name = "all_bases"
+        logger.info("No base name provided, switching to %s", base_name)
 
     # 1. Fit embeddings first
     if fit_embeddings:
@@ -171,7 +172,7 @@ async def predict(
 async def _read_dataset(parameters: dict) -> pd.DataFrame:
     data_filter = parameters["data_filter"]
     if USE_DETAILED_LOG:
-        logger.info("Reading data from db")
+        logger.info("Reading data from db: %s", data_filter)
     reader = Reader()
     X_y = await reader.read(data_filter)
 

@@ -747,7 +747,7 @@ class ModelManager:
             shutil.rmtree(model_dir)
 
     async def get_info(self, model_type=ModelTypes.rf, base_name=""):
-        model = self.get_model(model_type=model_type, base_name=base_name)
+        model = self.get_model(model_type=model_type, base_name=base_name, log=False)
 
         return {
             "status": model.status,

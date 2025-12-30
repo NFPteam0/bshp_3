@@ -176,7 +176,7 @@ class FastTextModel(Model):
         pipeline_list.append(("nan_processor", NanProcessor(self.parameters)))
 
         pipeline = Pipeline(pipeline_list)
-        X = pipeline.fit_transform(X)
+        X = pipeline.transform(X)
         # predict_detail
         # self.status != ModelStatuses.READY?
         if set_classes:

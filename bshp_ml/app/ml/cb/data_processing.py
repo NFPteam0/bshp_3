@@ -70,7 +70,7 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         X = X.copy()
-        X[self.y] = X[self.y].replace("", -1).astype(int)
+        X[self.y] = X[self.y].replace(r"^\s*$", None, regex=True).fillna(-1).astype(int)
 
         if USE_DETAILED_LOG:
             logger.info("Encoding, shape: %s", str(X.shape))
@@ -111,7 +111,8 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                     "Len of pred_name classes: %s",
                     len(X[f"pred_{self.name_col}"].unique()),
                 )
-        X[self.y] = X[self.y].replace("", None).fillna(-1).astype(int)
+        X[self.y] = X[self.y].replace(r"^\s*$", None, regex=True).fillna(-1).astype(int)
+        # тут
         return X
 
     def inverse_transform(self, X):

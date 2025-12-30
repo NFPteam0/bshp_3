@@ -182,7 +182,7 @@ class FastTextModel(Model):
             X = pipeline.fit_transform(X)
         except ValueError as e:
             logger.error("Can't transform empty data: X(%s)", X.shape)
-            raise e.with_traceback()
+            raise e
         # predict_detail
         # self.status != ModelStatuses.READY?
         if set_classes:

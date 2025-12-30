@@ -110,6 +110,7 @@ async def fit(
     except Exception as e:
         print(traceback.format_exc())
         logger.error(f"Error predicting: {e}")
+        await task_manager.update_task(task_id, status="ERROR", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
     # 3. Use fsttext model predictions for training catboost model,

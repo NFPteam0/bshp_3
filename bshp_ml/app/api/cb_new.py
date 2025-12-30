@@ -59,7 +59,7 @@ async def fit(
     if not base_name:
         base_name = "all_bases"
         logger.info("No base name provided, switching to %s", base_name)
-
+    parameters["calculate_metrics"] = False  # TODO: forced
     # 1. Fit embeddings first
     if fit_embeddings:
         task_id = str(uuid.uuid4())

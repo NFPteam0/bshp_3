@@ -176,7 +176,12 @@ class FastTextModel(Model):
         pipeline_list.append(("nan_processor", NanProcessor(self.parameters)))
 
         pipeline = Pipeline(pipeline_list)
-        X = pipeline.transform(X)
+        if USE_DETAILED_LOG:
+            logger.warning("Predict empty data? Shape %", X.shape)
+        try:
+            X = pipeline.fit_transform(X)
+        except ValueError:
+            logger.error("Can't transform empty data: X(%s)", X.shape)
         # predict_detail
         # self.status != ModelStatuses.READY?
         if set_classes:

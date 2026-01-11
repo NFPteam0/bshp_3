@@ -338,6 +338,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # X, y train
                 df_i = df_i.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
                 all_data = make_all_data(df_i, f"{y}_norm")
+                all_classes = all_data[f"{y}_norm"].unique()
 
                 df_test = df_i.sample(frac=0.05, random_state=SEED)
                 df_train = df_i.drop(df_test.index)
@@ -440,6 +441,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             # X, y train
             df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
             all_data = make_all_data(df, f"{y}_norm")
+            all_classes = all_data[f"{y}_norm"].unique()
 
             df_test = df.sample(frac=0.05, random_state=SEED)
             df_train = df.drop(df_test.index)

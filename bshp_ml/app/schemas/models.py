@@ -46,11 +46,11 @@ class DataRow(BaseModel):
     company_account_number: str
     contractor_account_number: str
     qty: float
-    price: float
-    sum: float
-    cash_flow_item_code: str
-    cash_flow_details_code: str
-    year: str
+    price: float | None
+    sum: float | None
+    cash_flow_item_code: str | None
+    cash_flow_details_code: str | None
+    year: str | None
 
     @field_validator("date", mode="before")
     def check_date(cls, value):

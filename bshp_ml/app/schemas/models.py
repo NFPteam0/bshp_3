@@ -20,7 +20,7 @@ class DataRow(BaseModel):
     kind: str
     company_inn: str
     company_kpp: str
-    base_document_number: str
+    base_document_number: str | int
     base_document_date: datetime
     base_document_kind: str
     base_document_operation_type: str
@@ -34,12 +34,12 @@ class DataRow(BaseModel):
     analytic: str
     analytic2: str
     analytic3: str
-    article_document_number: str
+    article_document_number: str | int
     article_document_date: datetime
     article_parent: str
     article_group: str
     article_kind: str
-    row_number: int
+    row_number: int | int
     article_row_number: int
     store: str
     department: str

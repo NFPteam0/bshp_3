@@ -138,7 +138,6 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         if USE_DETAILED_LOG:
             logger.info("Encoding, shape: %s", str(X.shape))
         X[self.y] = X[f"{self.y}_norm"].map(self.norm2code).fillna(-1)
-        X[self.y] = X[self.y].astype(str).str.zfill(9)
         return X
 
     # def _get_decoded_field(self, norm_value):

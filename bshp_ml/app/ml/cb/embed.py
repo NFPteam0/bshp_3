@@ -708,7 +708,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))
                     logger.info("Predicted: %s", X_y[y])
-
+        for y in self.y_columns:
+            X_y[y] = X_y[y].astype(str).str.zfill(9)
             # c_x_columns = c_x_columns + c_y_columns
         return X_y.to_dict(orient="records")
         # if self.need_to_encode:

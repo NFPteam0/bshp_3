@@ -291,11 +291,11 @@ async def fit(
 
 @app.get("/delete_model")
 async def delete_model(
-    base_name: str = Query(default=""),
-    model_type: ModelTypes = Query(default=ModelTypes.rf),
+    base_name: str = Query(default="all_bases"),
+    model_type: ModelTypes = Query(default=ModelTypes.catboost_txt),
     token: str = Depends(get_token_from_header),
     authenticated: bool = Depends(check_token),
-    model_manager=Depends(get_model_manager),
+    model_manager: ModelManager = Depends(get_model_manager),
 ) -> str:
     try:
         if not base_name:

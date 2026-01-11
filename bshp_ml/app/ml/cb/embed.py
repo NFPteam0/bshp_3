@@ -593,6 +593,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
         #     # "pred_cash_flow_details_name",
         # ]
         # TODO: не надо предсказывать пустые, если используем модели?
+        from .data_processing import check_fields
+
+        check_fields(
+            X_y,
+            [
+                col
+                for col in set(self.x_columns) | set(self.str_columns)
+                if col in X_y.columns
+            ],
+        )
 
         for y in self.y_columns:
             if USE_DETAILED_LOG:

@@ -48,7 +48,7 @@ async def fit(
     background_tasks: BackgroundTasks,
     token: str = Depends(get_token_from_header),
     # authenticated: bool = Depends(check_token),
-    base_name: str = Query(default=""),
+    base_name: str = Query(default="all_bases"),
     parameters: dict = Body(),
     model_manager: ModelManager = Depends(get_model_manager),
     fit_embeddings: bool = False,
@@ -89,6 +89,8 @@ async def fit(
             raise HTTPException(status_code=500, detail=str(e))
 
     # 2. Predict values with embeddings and pass it to catboost model
+    task_id = str(uuid.uuid4())
+    task = await task_manager.create_task(task_id)
     try:
         # TODO: долго
         X_y = await _read_dataset({"data_filter": {"base_name": base_name}})
@@ -119,8 +121,6 @@ async def fit(
     model_type = ModelTypes.catboost_txt
     logger.info(f"Start fitting model {model_type.value}")
 
-    task_id = str(uuid.uuid4())
-    task = await task_manager.create_task(task_id)
     try:
         await task_manager.update_task(
             task_id,

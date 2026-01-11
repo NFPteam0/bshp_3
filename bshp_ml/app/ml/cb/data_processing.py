@@ -172,3 +172,33 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             os.makedirs(folder)
         with open(os.path.join(folder, f"{name}.pkl"), "wb") as fp:
             pickle.dump(self, fp)
+
+
+def check_fields(
+    df: pd.DataFrame,
+    columns_to_check: list[str],
+):
+    # Создаем пустую маску
+    mask = pd.Series(False, index=df.index)
+
+    for col in columns_to_check:
+        if col in df.columns:
+            col_mask = (
+                df[col].isna()  # NaN
+                | (df[col].astype(str).str.strip() == "")  # пустые строки/пробелы
+                | df[col].isin([0, -1, "0", "-1"])  # невалидные значения
+            )
+            mask = mask | col_mask
+
+    if mask.any():
+        logger.warning(f"Contains empty fields ({mask.sum()}):")
+        logger.warning(
+            "\n"
+            + df.to_string(
+                index=True,  # Показать индексы
+                max_rows=None,  # Все строки
+                max_cols=None,  # Все колонки
+                line_width=1000,  # Широкая строка
+                show_dimensions=True,  # Показать размеры
+            )
+        )

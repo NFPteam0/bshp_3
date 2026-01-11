@@ -196,14 +196,14 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "learning_rate": [
                 lr,
                 #   0.002,
-                0.004,
+                # 0.004,
             ],
             "depth": [6],
             "iterations": [
                 trees,
                 # trees * 2,
                 max(int(trees * 0.7), 1),
-                300,
+                200,
                 #   400,
             ],
             "l2_leaf_reg": [4],

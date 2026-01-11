@@ -201,7 +201,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "depth": [6],
             "iterations": [
                 trees,
-                trees * 2,
+                # trees * 2,
                 max(int(trees * 0.7), 1),
                 # 300,
                 #   400,
@@ -279,6 +279,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         bscores = []
         # total_preds = pd.DataFrame(index=df.index)
         df = df.copy()
+        # drop here? No ' '(-1) for models?
 
         if y == "cash_flow_details_code":
             self.field_models[y] = {}
@@ -335,6 +336,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     continue
 
                 # X, y train
+                df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
+                all_data = make_all_data(df, f"{y}_norm")
+
                 df_test = df_i.sample(frac=0.05, random_state=SEED)
                 df_train = df_i.drop(df_test.index)
 
@@ -434,6 +438,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 self.strict_acc[y] = this_label
                 return
             # X, y train
+            df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
+            all_data = make_all_data(df, f"{y}_norm")
+
             df_test = df.sample(frac=0.05, random_state=SEED)
             df_train = df.drop(df_test.index)
 
@@ -557,8 +564,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
         if USE_DETAILED_LOG:
             logger.info("Transforming and checking data")
         X = pd.DataFrame(X)
-        row_numbers = list(X.index)
-        X_result = X.copy()
 
         pipeline_list = []
         pipeline_list.append(("checker", Checker(self.parameters, for_predict=True)))
@@ -585,6 +590,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         #     # "pred_cash_flow_item_name",
         #     # "pred_cash_flow_details_name",
         # ]
+        # TODO: не надо предсказывать пустые, если используем модели?
 
         for y in self.y_columns:
             if USE_DETAILED_LOG:

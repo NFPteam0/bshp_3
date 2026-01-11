@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import traceback
 import uuid
 from contextlib import asynccontextmanager
@@ -136,6 +137,13 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down prediction service...")
 
+
+# if os.getenv("DEBUG") == "true":
+#     import debugpy
+
+#     debugpy.listen(("0.0.0.0", 5678))
+#     logger.info("Debugpy is listening on 5678")
+#     debugpy.wait_for_client()
 
 app = FastAPI(
     title="BSHP App",

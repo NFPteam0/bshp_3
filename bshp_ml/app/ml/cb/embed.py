@@ -202,8 +202,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "iterations": [
                 trees,
                 # trees * 2,
-                max(int(trees * 0.7), 1),
-                200,
+                # max(int(trees * 0.7), 1),
+                # 200,
                 #   400,
             ],
             "l2_leaf_reg": [4],
@@ -386,7 +386,21 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     all_data=all_data,
                 )
                 self.field_models[y][int(item)] = model_i
-                # TODO: check
+
+                # TODO: если fsttxt model справляется лучше?
+                if False:
+                    if (
+                        len(
+                            df[
+                                df["pred_cash_flow_item_name"]
+                                == df["cash_flow_item_name"]
+                            ]
+                        )
+                        / len(df)
+                        > ...
+                    ):
+                        self._save_cb_model(model_i, column=y, item=int(item))
+                        ...
                 self._save_cb_model(model_i, column=y, item=int(item))
 
         else:

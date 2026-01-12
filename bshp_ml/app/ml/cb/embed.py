@@ -194,7 +194,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         """
         param_grid = {
             "learning_rate": [
-                lr,
+                # lr,
                 #   0.002,
                 0.017,
             ],
@@ -203,7 +203,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
-                200,
+                100,
+                # 200,
                 #   400,
             ],
             "l2_leaf_reg": [4],
@@ -714,8 +715,23 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     )
                     if USE_DETAILED_LOG:
                         logging.info(f"Feature names: {model.feature_names_}")
+                        importance = (
+                            pd.DataFrame(
+                                {
+                                    "imp": model.get_feature_importance(),
+                                    "names": model.feature_names_,
+                                }
+                            )
+                            .sort_values("imp", ascending=False)
+                            .head()
+                        )
+                        logging.info(
+                            f"For {y} most important fields are:\n%s",
+                            importance.to_json,
+                        )
 
                     predictions = model.predict(X_pool, prediction_type="Class")
+
                     X_y[f"{y}_norm"] = predictions.ravel()
                     X_y = encoder.inverse_transform(X_y)
 

@@ -137,19 +137,19 @@ class CatBoostModelEmbeddings(CatBoostModel):
         # test_pool = self.get_test_pool(
         #     df_test=df_test, y=y, to_drop=to_drop, cat_idxs=cat_idxs
         # )
-
+        BSIZE = 10_000
         for n, batch in enumerate(
             self.get_batch_pool(
                 df=df_train,
                 y=y,
                 to_drop=to_drop,
                 cat_idxs=cat_idxs,
-                batch_size=25_000,
+                batch_size=BSIZE,
                 all_data=all_data,
             )
         ):
             if USE_DETAILED_LOG:
-                logger.info(f"BATCH {n} of total {len(df_train) // 25_000 + 1}")
+                logger.info(f"BATCH {n + 1} of total {len(df_train) // BSIZE + 1}")
             if model is None:
                 model = CatBoostClassifier(**params)
                 batch.set_baseline(np.zeros(shape=(batch.num_row(), len(all_data))))
@@ -341,7 +341,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 all_data = make_all_data(df_i, f"{y}_norm")
                 all_classes = all_data[f"{y}_norm"].unique()
 
-                df_test = df_i.sample(frac=0.05, random_state=SEED)
+                df_test = df_i.sample(frac=0.1, random_state=SEED)
                 df_train = df_i.drop(df_test.index)
 
                 if len(df_test) == 0:
@@ -458,7 +458,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             all_data = make_all_data(df, f"{y}_norm")
             all_classes = all_data[f"{y}_norm"].unique()
 
-            df_test = df.sample(frac=0.05, random_state=SEED)
+            df_test = df.sample(frac=0.1, random_state=SEED)
             df_train = df.drop(df_test.index)
 
             cat_idxs = [

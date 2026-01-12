@@ -300,6 +300,7 @@ async def delete_model(
     try:
         if not base_name:
             base_name = "all_bases"
+        model_type = ModelTypes.catboost_txt
         await model_manager.delete_model(model_type=model_type, base_name=base_name)
         return "Model has been deleted"
     except Exception as e:

@@ -201,8 +201,23 @@ class FastTextModel(Model):
         # y = self._model.predict(X)
         # X_y[y_col] = y.ravel()
         # details cols
+        UNFEATURED = [
+            "company_inn",
+            "company_kpp",
+            "contractor_inn",
+            "contractor_kpp",
+            "company_account_number",
+            "contractor_account_number",
+            "cash_flow_item_code",
+            "cash_flow_item_name",
+            "cash_flow_details_code",
+            "cash_flow_details_name",
+            "year",
+        ]
         tmp_cols = []
-        all_sentences = prepare_sentences(X, self.str_columns + tmp_cols)
+        all_sentences = prepare_sentences(
+            X, [col for col in self.str_columns if col not in UNFEATURED] + tmp_cols
+        )
         sentences = all_sentences
         result = {}
         for y in self.y_columns:
@@ -213,7 +228,12 @@ class FastTextModel(Model):
                 tmp_cols.append("pred_cash_flow_item_name")
 
                 if "pred_cash_flow_item_name" in X.columns:
-                    sentences_i = prepare_sentences(X, tmp_cols)
+                    # sentences_i = prepare_sentences(X, tmp_cols)
+                    sentences_i = prepare_sentences(
+                        X,
+                        [col for col in self.str_columns if col not in UNFEATURED]
+                        + tmp_cols,
+                    )
                 else:
                     logger.warning("No predictions for items")
                 if sentences_i:

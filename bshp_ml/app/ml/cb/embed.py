@@ -70,12 +70,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
         self.categorical = [
             "moving_type",
             "company_inn",
-            "company_kpp",  # TODO: убрать
             "base_document_kind",
             "contractor_inn",
             "contractor_kind",
-            "company_account_number",
-            "contractor_account_number",
             "cash_flow_item_code",
             "year",
             "cash_flow_details_code",
@@ -102,10 +99,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         self.date_columns = [
             "date",
-            "base_document_date",  # По факту нужна только эта
+            "base_document_date",
             "article_document_date",
-            # "uploading_date",
+            "uploading_date",
         ]
+        self.str_columns += self.date_columns
         self.parameters = {
             "x_columns": self.x_columns,
             "y_columns": self.y_columns,
@@ -280,6 +278,27 @@ class CatBoostModelEmbeddings(CatBoostModel):
         bscores = []
         # total_preds = pd.DataFrame(index=df.index)
         df = df.copy()
+        UNFEATURED = [
+            "company_inn",
+            "contractor_name",
+            "contractor_kpp",
+            "qty",
+            "price",
+            "sum",
+            "contractor_account_number",
+            "company_account_number",
+            "article_row_number",
+            "row_number",
+            "number",
+        ]
+        df = df.drop(
+            labels=[
+                col
+                for col in UNFEATURED
+                if col not in self.categorical and col in df.columns
+            ],
+            axis=1,
+        )
         # drop here? No ' '(-1) for models?
 
         if y == "cash_flow_details_code":
@@ -811,7 +830,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
             Xy = self.make_full(df=df, all_data=all_data, y=f"{y}", i=i, j=j)
             y_batch = Xy[f"{y}"]
             X_batch = Xy.drop([y for y in self.y_columns if y in Xy.columns], axis=1)
-            X_batch = Xy.drop(to_drop, axis=1)
+            # TODO: columns to upper layer
+            X_batch = Xy.drop(columns=set(to_drop) | {y}, axis=1)
             pool = Pool(
                 X_batch,
                 label=y_batch,
@@ -836,7 +856,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         self.make_full(df=df_test, y=y, all_data=all_data, i=0, j=len(df_test))
         y_test = df_test[f"{y}"]
         # X_test = df_test.drop([y for y in self.y_columns if y in df_test.columns], axis=1)
-        X_test = df_test.drop(to_drop, axis=1)
+        X_test = df_test.drop(columns=set(to_drop) | {y}, axis=1)
         X_test.columns
         # text_features=txts)
         pool = Pool(

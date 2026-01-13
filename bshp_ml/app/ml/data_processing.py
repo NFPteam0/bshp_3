@@ -140,7 +140,7 @@ class FeatureAdder(BaseEstimator, TransformerMixin):
             logger.info("Feature adding")
 
         for col in self.date_columns:
-            if X[col].dtype in ["string", "object"] and col != "uploading_date":
+            if col != "uploading_date" and X[col].dtype in ["string", "object"]:
                 # X[col] = X[col].apply(str_to_date)
                 X[col] = pd.to_datetime(
                     X[col],

@@ -1094,9 +1094,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
             item = int(item)
             if not hasattr(self.field_encoders[column], "item"):
                 logging.warning(f"No item {item} in {list(self.field_encoders.keys())}")
-                logging.warning(
-                    f"No item {item} in {[v[item].df for k, v in self.field_encoders.items() if isinstance(v, dict)]}"
-                )
+                # logging.warning(
+                #     f"No item {item} in {[v[item].df for k, v in self.field_encoders.items() if isinstance(v, dict)]}"
+                # )
             encoder = self.field_encoders[column][item]
             encoder.save(col_path, item)
         elif self.field_encoders.get(column):

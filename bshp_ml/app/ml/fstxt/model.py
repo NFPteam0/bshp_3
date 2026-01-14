@@ -264,8 +264,13 @@ class FastTextModel(Model):
                 ]
                 for cls in all_classes_names
             }
+            word2name = {
+                cls + str(self.all_classes_codes[y][cls]): cls
+                for cls in all_classes_names
+            }
             vectors = np.vstack(list(wordvec.values()))
             words = list(wordvec.keys())
+            words = [word2name[word] for word in words]
             # TODO: add validation?
             for sentence in sentences:
                 # target_vector = self.sentence_vector(sentence, self._model.wv)

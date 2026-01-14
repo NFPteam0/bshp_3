@@ -276,6 +276,7 @@ class FastTextModel(Model):
             # TODO: add validation?
             for sentence in sentences:
                 # target_vector = self.sentence_vector(sentence, self._model.wv)
+                # TODO: тут 10 * article_name
                 target_vector = self.sentence_vector_cached(
                     tuple(sentence), self.base_name, self.model_type
                 )

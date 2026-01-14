@@ -23,7 +23,24 @@ def prepare_sentences(df: pd.DataFrame, txt_cols) -> list[list[str]]:
     Подготавливает предложения для обучения FastText
     """
     df_txt = df[txt_cols].astype(str)
+    HIGH_IMP = [
+        "contractor_name",
+        "article_name",
+        "payment_purpose",
+        "payment_purpose_returned",
+    ]
+    for col in HIGH_IMP:
+        if col in df_txt.columns:
+            df_txt[col] = (df_txt[col] + " ") * 5
+
     df_txt = df_txt.agg(" ".join, axis=1)
+    # # TODO: тут 10 * article_name?
+    # sentences_i = prepare_sentences(
+    #     X,
+    #     [col if  for col in self.str_columns if col not in UNFEATURED]
+    #     + tmp_cols,
+    # )
+    #
 
     cleaned = preprocess_text(df_txt)
 

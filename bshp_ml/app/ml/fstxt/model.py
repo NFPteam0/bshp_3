@@ -259,8 +259,8 @@ class FastTextModel(Model):
                 logging.info("Feed model with %d txt columns", len(X.columns))
             # wordvec = {cls: self._model.wv[cls] for cls in all_classes_names}
             wordvec = {
-                cls + str(self.all_classes_codes[cls]): self._model.wv[
-                    cls + str(self.all_classes_codes[cls])
+                cls + str(self.all_classes_codes[y][cls]): self._model.wv[
+                    cls + str(self.all_classes_codes[y][cls])
                 ]
                 for cls in all_classes_names
             }

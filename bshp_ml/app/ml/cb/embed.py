@@ -76,6 +76,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "cash_flow_item_code",
             "year",
             "cash_flow_details_code",
+            "contract_name",  # TODO: number?
         ]
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])
@@ -90,10 +91,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 "article_document_number",
                 "article_code",
                 "payment_purpose_returned",
+                "contract_name",
+                "contract_number",
             ]
         )
         self.x_columns.extend(
-            [f"pred_{y}" for y in self.fsttxt_columns] + ["payment_purpose"]
+            [f"pred_{y}" for y in self.fsttxt_columns]
+            + ["payment_purpose", "contract_name", "contract_number"]
         )
         self.columns_to_encode = self.categorical
 
@@ -1092,11 +1096,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         if item is not None:
             item = int(item)
-            if not hasattr(self.field_encoders[column], "item"):
-                logging.warning(f"No item {item} in {list(self.field_encoders.keys())}")
-                # logging.warning(
-                #     f"No item {item} in {[v[item].df for k, v in self.field_encoders.items() if isinstance(v, dict)]}"
-                # )
+            # if not hasattr(self.field_encoders[column], "item"):
+            # logging.warning(f"No item {item} in {list(self.field_encoders.keys())}")
+            # logging.warning(
+            #     f"No item {item} in {[v[item].df for k, v in self.field_encoders.items() if isinstance(v, dict)]}"
+            # )
             encoder = self.field_encoders[column][item]
             encoder.save(col_path, item)
         elif self.field_encoders.get(column):

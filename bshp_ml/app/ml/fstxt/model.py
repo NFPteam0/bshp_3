@@ -50,6 +50,8 @@ class FastTextModel(Model):
                 "payment_purpose",
                 "kind",
                 "payment_purpose_returned",
+                "contract_name",
+                "contract_number",
             ]
         )
         self.y_columns = [

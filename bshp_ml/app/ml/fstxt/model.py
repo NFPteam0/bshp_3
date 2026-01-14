@@ -187,11 +187,21 @@ class FastTextModel(Model):
         # self.status != ModelStatuses.READY?
         if set_classes:
             self.all_classes_names = {col: X[col].unique() for col in self.y_columns}
+            # TODO: коды сюда?
             if USE_DETAILED_LOG:
                 logger.info(
                     "Classes found: %s",
                     str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
                 )
+            self.name2code = {
+                "cash_flow_item_name": "cash_flow_item_code",
+                "cash_flow_details_name": "cash_flow_details_code",
+                "year": "year",
+            }
+            self.all_classes_codes = {
+                col: dict(zip(X[col].unique(), X[self.name2code[col]].astype(int)))
+                for col in self.y_columns
+            }
         if self.all_classes_names is None:
             raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 
@@ -247,7 +257,13 @@ class FastTextModel(Model):
                 logging.info("Predicting %s", y)
                 logging.info("Overall classes %d", len(self.all_classes_names[y]))
                 logging.info("Feed model with %d txt columns", len(X.columns))
-            wordvec = {cls: self._model.wv[cls] for cls in all_classes_names}
+            # wordvec = {cls: self._model.wv[cls] for cls in all_classes_names}
+            wordvec = {
+                cls + str(self.all_classes_codes[cls]): self._model.wv[
+                    cls + str(self.all_classes_codes[cls])
+                ]
+                for cls in all_classes_names
+            }
             vectors = np.vstack(list(wordvec.values()))
             words = list(wordvec.keys())
             # TODO: add validation?

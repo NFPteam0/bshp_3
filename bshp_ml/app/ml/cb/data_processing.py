@@ -137,6 +137,12 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             # X[self.name_col] = X[f"pred_{self.name_col}"]
         if USE_DETAILED_LOG:
             logger.info("Encoding, shape: %s", str(X.shape))
+            logger.info(
+                "Norm code: %s, 1CCode: %s, Name: %s",
+                X[f"{self.y}_norm"].iloc[0],
+                X[f"{self.y}_norm"].map(self.norm2code),
+                X[f"{self.name_col}"].iloc[0],
+            )
         X[self.y] = X[f"{self.y}_norm"].map(self.norm2code).fillna(-1)
         return X
 

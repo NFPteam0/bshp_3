@@ -762,8 +762,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     logger.info('Predicting model. Field = "{}". Done'.format(y))
                     logger.info("Predicted: %s", X_y[y])
         for y in self.y_columns:
-            X_y[y] = X_y[y].astype(str).str.zfill(9)
-            # c_x_columns = c_x_columns + c_y_columns
+            if y != "year":
+                X_y[y] = X_y[y].astype(str).str.zfill(9)
         return X_y.to_dict(orient="records")
         # if self.need_to_encode:
         #     X_y = pipeline.named_steps["data_encoder"].inverse_transform(X_y)

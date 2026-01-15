@@ -80,6 +80,17 @@ class FastTextModel(Model):
                 self.all_classes_names = {
                     col: df[col].unique() for col in self.y_columns
                 }
+                self.name2code = {
+                    "cash_flow_item_name": "cash_flow_item_code",
+                    "cash_flow_details_name": "cash_flow_details_code",
+                    "year": "year",
+                }
+                self.all_classes_codes = {
+                    col: dict(
+                        zip(df[col].unique(), df[self.name2code[col]].astype(int))
+                    )
+                    for col in self.y_columns
+                }
                 logger.info(
                     "Classes found: %s",
                     str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
@@ -204,7 +215,7 @@ class FastTextModel(Model):
                 col: dict(zip(X[col].unique(), X[self.name2code[col]].astype(int)))
                 for col in self.y_columns
             }
-        if self.all_classes_names is None:
+        if self.all_classes_names is None or self.all_classes_codes is None:
             raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 
         # X[self.y_columns] = ""

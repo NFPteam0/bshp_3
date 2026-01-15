@@ -1,0 +1,188 @@
+[
+{
+
+"number": "000021651",
+
+"date": "01.01.2025 12:00:04",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "00БП-000006",
+
+"base_document_date": "15.01.2025 14:43:03",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ФизическоеЛицо",
+
+"contractor_name": "Работники",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "Основной договор (покупатели)",
+
+"contract_number": "",
+
+"article_document_number": "00БП-000014",
+
+"article_document_date": "15.01.2025 14:20:52",
+
+"article_document_found": "true",
+
+"article_name": "Озимый ячмень 2024",
+
+"article_code": "БП-00021771",
+
+"is_main_asset": "false",
+
+"analytic": "Озимый ячмень 2024",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "2024",
+
+"article_group": "Озимый ячмень 2024",
+
+"article_kind": "Продукция растениеводства",
+
+"store": "Зерносклад (Балахоновский)",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 1,
+
+"qty": 2000,
+
+"price": 14,
+
+"sum": 28000,
+
+"article_row_number": 1,
+
+"cash_flow_item_code": "",
+
+"year": "",
+
+"cash_flow_details_code": "",
+
+"cash_flow_item_name": "",
+
+"cash_flow_details_name": "",
+
+"payment_purpose": "Озимый ячмень 2024 - 2000 кг",
+
+"payment_purpose_returned": ""
+
+},
+
+{
+
+"number": "000021651",
+
+"date": "01.01.2025 12:00:04",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "00БП-000006",
+
+"base_document_date": "15.01.2025 14:43:03",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ФизическоеЛицо",
+
+"contractor_name": "Работники",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "Основной договор (покупатели)",
+
+"contract_number": "",
+
+"article_document_number": "00БП-000014",
+
+"article_document_date": "15.01.2025 14:20:52",
+
+"article_document_found": "true",
+
+"article_name": "Озимый ячмень 2024",
+
+"article_code": "БП-00021771",
+
+"is_main_asset": "false",
+
+"analytic": "Озимый ячмень 2024",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "2024",
+
+"article_group": "Озимый ячмень 2024",
+
+"article_kind": "Продукция растениеводства",
+
+"store": "Зерносклад (Балахоновский)",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 1,
+
+"qty": 2,
+
+"price": 14000,
+
+"sum": 28000,
+
+"article_row_number": 1,
+
+"cash_flow_item_code": "000000184",
+
+"year": "2024",
+
+"cash_flow_details_code": "000000241",
+
+"cash_flow_item_name": "оз. ячмень",
+
+"cash_flow_details_name": "Озимый ячмень",
+
+"payment_purpose": "Озимый ячмень 2024 - 2000 кг",
+
+"payment_purpose_returned": ""
+
+}]

@@ -666,7 +666,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         and self.strict_acc[y].get(int(item_col)) is not None
                     ):
                         # No model nedeed
-                        Xy1[y] = self.strict_acc[y][int(item_col)]
+                        Xy1[f"{y}_norm"] = self.strict_acc[y][int(item_col)]
                     else:
                         # TODO: поправить, чтобы везде были либо инты, либо строки с 0ми
                         # encoder = self.field_encoders[y].get(int(item_col))
@@ -764,6 +764,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
         for y in self.y_columns:
             if y != "year":
                 X_y[y] = X_y[y].astype(str).str.zfill(9)
+            else:
+                X_y[y] = X_y[y].astype(str)
         return X_y.to_dict(orient="records")
         # if self.need_to_encode:
         #     X_y = pipeline.named_steps["data_encoder"].inverse_transform(X_y)

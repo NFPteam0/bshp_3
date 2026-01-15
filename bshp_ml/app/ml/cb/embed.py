@@ -1101,6 +1101,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             # logging.warning(
             #     f"No item {item} in {[v[item].df for k, v in self.field_encoders.items() if isinstance(v, dict)]}"
             # )
+            # TODO: fix если не сбрасывали обучения, то ошибка
             encoder = self.field_encoders[column][item]
             encoder.save(col_path, item)
         elif self.field_encoders.get(column):

@@ -87,7 +87,10 @@ class FastTextModel(Model):
                 }
                 self.all_classes_codes = {
                     col: dict(
-                        zip(df[col].unique(), df[self.name2code[col]].astype(int))
+                        zip(
+                            df[col].unique(),
+                            df[self.name2code[col]].replace("", -1).astype(int),
+                        )
                     )
                     for col in self.y_columns
                 }

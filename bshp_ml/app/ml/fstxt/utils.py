@@ -28,6 +28,9 @@ def prepare_sentences(df: pd.DataFrame, txt_cols) -> list[list[str]]:
         "article_name",
         "payment_purpose",
         "payment_purpose_returned",
+        "analytic",
+        "analytic2",
+        "analytic3",
     ]
     for col in HIGH_IMP:
         if col in df_txt.columns:

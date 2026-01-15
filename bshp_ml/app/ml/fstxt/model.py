@@ -268,7 +268,7 @@ class FastTextModel(Model):
             # }
             wordvec = {
                 cls + str(self.all_classes_codes[y][cls]): self.sentence_vector_cached(
-                    tuple(cls.lower() + str(self.all_classes_codes[y][cls])),
+                    tuple((cls.lower() + str(self.all_classes_codes[y][cls])).split()),
                     self.base_name,
                     self.model_type,
                 )

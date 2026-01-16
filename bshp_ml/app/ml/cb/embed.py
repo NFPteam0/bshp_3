@@ -476,6 +476,23 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # (f"Only one {y} code, no need for model")
                 self.strict_acc[y] = this_label
                 return
+            if y == "year" and ...:
+                self.items_wo_year = ...
+                ...
+                items = ...
+                for item in items:
+                    if df[y][item].query(
+                        f"`{y}_norm` in ['', ' '] and `{y}_norm` != -1"
+                    ):
+                        self.items_wo_year += item
+
+                def predict_year():
+                    if item in self.items_wo_year:
+                        return ""
+                    else:
+                        model = ...
+                        model.predict()
+
             # X, y train
             df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
             all_data = make_all_data(df, f"{y}_norm")

@@ -477,17 +477,17 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # (f"Only one {y} code, no need for model")
                 self.strict_acc[y] = this_label
                 return
-            if y == "year":
-                year_mask = df.groupby(ITEM)[f"{ITEM}"].apply(
-                    lambda x: ((x.str.strip() != "") & (x != -1)).any()
-                )
-                self.items_wo_year = set(year_mask[~year_mask].index.astype(int))
-                if USE_DETAILED_LOG:
-                    logging.info(
-                        "Items without year: %s,\n Items with year: %s",
-                        len(self.items_wo_year),
-                        len(set(year_mask[year_mask].index.astype(int))),
-                    )
+            # if y == "year":
+            #     year_mask = df.groupby(ITEM)[f"{ITEM}"].apply(
+            #         lambda x: ((x.str.strip() != "") & (x != -1)).any()
+            #     )
+            #     self.items_wo_year = set(year_mask[~year_mask].index.astype(int))
+            #     if USE_DETAILED_LOG:
+            #         logging.info(
+            #             "Items without year: %s,\n Items with year: %s",
+            #             len(self.items_wo_year),
+            #             len(set(year_mask[year_mask].index.astype(int))),
+            #         )
 
             # X, y train
             df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
@@ -543,17 +543,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
             self.strict_acc[y] = {}
             if USE_DETAILED_LOG:
                 logger.info('Start Fitting model. Field = "{}"'.format(y))
-            if y == "year":
-                self.train_on_field(
-                    df=df,
-                    y=y,
-                    to_drop=["year", "cash_flow_details_code"],
-                    parameters=parameters,
-                )
-            else:
-                self.train_on_field(
-                    df=df, y=y, to_drop=self.y_columns, parameters=parameters
-                )
+            self.train_on_field(
+                df=df, y=y, to_drop=self.y_columns, parameters=parameters
+            )
             gc.collect()
             # self._save_cb_model(model, column=y, item=item)
             # self._load_all_models()

@@ -343,7 +343,7 @@ class FastTextModel(Model):
 
     def sentence_vector(self, words: list[str], wv):
         v = [wv[word] for word in words]
-        return np.mean(v, axis=0)
+        return np.sum(v, axis=0)
 
     @staticmethod
     @lru_cache(maxsize=20_000)

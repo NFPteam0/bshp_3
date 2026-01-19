@@ -491,7 +491,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             #             return ""
             #         else:
             #             model = ...
-            #             model.predict()
+            #             return model.predict()
 
             # X, y train
             df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")

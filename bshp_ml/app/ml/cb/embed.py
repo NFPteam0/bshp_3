@@ -49,6 +49,7 @@ from .data_processing import CBDataEncoder
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
 SEED = 42
+ITEM = "cash_flow_item_code"
 
 
 class CatBoostModelEmbeddings(CatBoostModel):
@@ -476,22 +477,17 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # (f"Only one {y} code, no need for model")
                 self.strict_acc[y] = this_label
                 return
-            # if y == "year" and ...:
-            #     self.items_wo_year = df[...]
-            #     ...
-            #     items = ...
-            #     for item in items:
-            #         if df[y][item].query(
-            #             f"`{y}_norm` in ['', ' '] and `{y}_norm` != -1"
-            #         ):
-            #             self.items_wo_year += item
-
-            #     def predict_year():
-            #         if item in self.items_wo_year:
-            #             return ""
-            #         else:
-            #             model = ...
-            #             return model.predict()
+            if y == "year":
+                year_mask = df.groupby(ITEM)[f"{ITEM}"].apply(
+                    lambda x: ((x.str.strip() != "") & (x != -1)).any()
+                )
+                self.items_wo_year = set(year_mask[~year_mask].index.astype(int))
+                if USE_DETAILED_LOG:
+                    logging.info(
+                        "Items without year: %s,\n Items with year: %s",
+                        len(self.items_wo_year),
+                        len(set(year_mask[year_mask].index.astype(int))),
+                    )
 
             # X, y train
             df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
@@ -547,9 +543,17 @@ class CatBoostModelEmbeddings(CatBoostModel):
             self.strict_acc[y] = {}
             if USE_DETAILED_LOG:
                 logger.info('Start Fitting model. Field = "{}"'.format(y))
-            self.train_on_field(
-                df=df, y=y, to_drop=self.y_columns, parameters=parameters
-            )
+            if y == "year":
+                self.train_on_field(
+                    df=df,
+                    y=y,
+                    to_drop=["year", "cash_flow_details_code"],
+                    parameters=parameters,
+                )
+            else:
+                self.train_on_field(
+                    df=df, y=y, to_drop=self.y_columns, parameters=parameters
+                )
             gc.collect()
             # self._save_cb_model(model, column=y, item=item)
             # self._load_all_models()
@@ -559,6 +563,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
         X_y = pd.DataFrame(Xy_api)
         logger.info("Fitting")
         try:
+            self.field_encoders = {}
+            self.field_models = {}
+            self.items_wo_year = None
             need_to_initialize = (
                 self.status in [ModelStatuses.CREATED, ModelStatuses.ERROR]
                 or parameters.get("refit") == 0
@@ -725,6 +732,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 ):
                     X_y[y] = self.strict_acc[y]
                 else:
+                    if y == "year":
+                        year_mask = X[ITEM].isin(self.items_wo_year)
                     X = X_y.copy()
                     model = field_models[y]
                     logging.info("Encoders: %s", list(self.field_encoders.keys()))
@@ -774,6 +783,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                     X_y[f"{y}_norm"] = predictions.ravel()
                     X_y = encoder.inverse_transform(X_y)
+                    if y == "year":
+                        X_y.loc[year_mask, y] = ""
 
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))

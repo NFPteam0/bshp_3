@@ -733,7 +733,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     X_y[y] = self.strict_acc[y]
                 else:
                     if y == "year":
-                        year_mask = X[ITEM].isin(self.items_wo_year)
+                        year_mask = X_y[ITEM].isin(self.items_wo_year)
                     X = X_y.copy()
                     model = field_models[y]
                     logging.info("Encoders: %s", list(self.field_encoders.keys()))
@@ -1126,7 +1126,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         if item is not None:
             item = int(item)
-            if not hasattr(self.field_encoders[column], item):
+            if not hasattr(self.field_encoders[column], "item"):
                 logging.warning(
                     f"No item {item} in {list(self.field_encoders.keys())}. No encoder to save"
                 )

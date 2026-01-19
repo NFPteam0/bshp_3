@@ -732,8 +732,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 ):
                     X_y[y] = self.strict_acc[y]
                 else:
-                    if y == "year":
-                        year_mask = X_y[ITEM].isin(self.items_wo_year)
+                    # if y == "year":
+                    #     year_mask = X_y[ITEM].isin(self.items_wo_year)
                     X = X_y.copy()
                     model = field_models[y]
                     logging.info("Encoders: %s", list(self.field_encoders.keys()))
@@ -783,8 +783,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                     X_y[f"{y}_norm"] = predictions.ravel()
                     X_y = encoder.inverse_transform(X_y)
-                    if y == "year":
-                        X_y.loc[year_mask, y] = ""
+                    # if y == "year":
+                    #     X_y.loc[year_mask, y] = ""
 
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))

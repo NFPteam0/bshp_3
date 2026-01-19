@@ -33,19 +33,12 @@ def prepare_sentences(df: pd.DataFrame, txt_cols) -> list[list[str]]:
         "analytic3",
     ]
     for col in HIGH_IMP:
-        if col == "payment_purpose" or col == "payment_purpose_returned":
-            df_txt[col] = df_txt[col].str.replace(RE_NUMBERS, " ", regex=True)
         if col in df_txt.columns:
+            if col == "payment_purpose" or col == "payment_purpose_returned":
+                df_txt[col] = df_txt[col].str.replace(RE_NUMBERS, " ", regex=True)
             df_txt[col] = (df_txt[col] + " ") * 20
 
-    df_txt = df_txt.agg(" ".join, axis=1)
-    # # TODO: тут 10 * article_name?
-    # sentences_i = prepare_sentences(
-    #     X,
-    #     [col if  for col in self.str_columns if col not in UNFEATURED]
-    #     + tmp_cols,
-    # )
-    #
+    df_txt = df_txt[HIGH_IMP].agg(" ".join, axis=1)
 
     cleaned = preprocess_text(df_txt)
 

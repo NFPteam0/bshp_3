@@ -38,8 +38,8 @@ def prepare_sentences(df: pd.DataFrame, txt_cols) -> list[list[str]]:
                 df_txt[col] = df_txt[col].str.replace(RE_NUMBERS, " ", regex=True)
             df_txt[col] = (df_txt[col] + " ") * 20
 
-    # df_txt = df_txt[HIGH_IMP].agg(" ".join, axis=1)
-    df_txt = df_txt.agg(" ".join, axis=1)
+    df_txt = df_txt[HIGH_IMP].agg(" ".join, axis=1)
+    # df_txt = df_txt.agg(" ".join, axis=1)
 
     cleaned = preprocess_text(df_txt)
 

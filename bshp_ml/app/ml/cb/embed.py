@@ -78,6 +78,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "year",
             "cash_flow_details_code",
             "contract_name",  # TODO: number?
+            "accepted_issued",
         ]
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])
@@ -94,11 +95,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 "payment_purpose_returned",
                 "contract_name",
                 "contract_number",
+                "accepted_issued",
             ]
         )
         self.x_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
-            + ["payment_purpose", "contract_name", "contract_number"]
+            + ["payment_purpose", "contract_name", "contract_number", "accepted_issued"]
         )
         self.columns_to_encode = self.categorical
 
@@ -1118,7 +1120,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         if item is not None:
             item = int(item)
-            if not hasattr(self.field_encoders[column], "item"):
+            if item not in self.field_encoders[column]:
                 logging.warning(
                     f"No item {item} in {list(self.field_encoders.keys())}. No encoder to save"
                 )
@@ -1135,8 +1137,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
     def _load_cb_encoder(self, path, name="encoder.pkl") -> CBDataEncoder:
         if os.path.exists(path):
-            with open(os.path.join(path, name), "rb") as fp:
-                return pickle.load(fp)
+            try:
+                with open(os.path.join(path, name), "rb") as fp:
+                    return pickle.load(fp)
+            except FileNotFoundError as e:
+                logging.error("No encoder found: %s", e)
+                raise e
 
     def _load_encoder(self):
         pass

@@ -101,6 +101,7 @@ class ExtDataRow(DataRow):
     payment_purpose_returned: str | None = None
     contract_name: str | None = None
     contract_number: str | None = None
+    accepted_issued: str | None = None
 
 
 class MetadataCb(Enum):

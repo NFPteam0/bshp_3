@@ -6,6 +6,7 @@ import numpy as np
 RE_CHARS = re.compile(r"[^a-zA-Zа-яА-ЯёЁ0-9\s]")
 RE_SPACES = re.compile(r"\s+")
 RE_NUMBERS = re.compile(r"[^a-zA-Zа-яА-ЯёЁ\s]")
+RE_SMALL = re.compile(r"\b\w{1-2}\b")
 
 
 def preprocess_text(s: pd.Series) -> pd.Series:
@@ -15,6 +16,7 @@ def preprocess_text(s: pd.Series) -> pd.Series:
     s = s.fillna("").astype(str).str.lower()
     s = s.str.replace(RE_CHARS, " ", regex=True)
     s = s.str.replace(RE_SPACES, " ", regex=True).str.strip()
+    s = s.str.replace(RE_SMALL, " ", regex=True)
 
     return s
 
@@ -24,6 +26,7 @@ def prepare_sentences(df: pd.DataFrame, txt_cols) -> list[list[str]]:
     Подготавливает предложения для обучения FastText
     """
     df_txt = df[txt_cols].astype(str)
+
     HIGH_IMP = [
         "article_name",
         "payment_purpose",

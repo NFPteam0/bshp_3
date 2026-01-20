@@ -202,6 +202,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # lr,
                 #   0.002,
                 0.017,
+                None,
             ],
             "depth": [6],
             "iterations": [

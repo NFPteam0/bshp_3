@@ -1,0 +1,189 @@
+[
+{
+
+"number": "000023071",
+
+"date": "01.04.2025 12:07:23",
+
+"is_reverse": "false",
+
+"moving_type": "Расходы",
+
+"base_document_number": "00БП-001174",
+
+"base_document_date": "28.04.2025 23:59:59",
+
+"base_document_kind": "СписаниеСРасчетногоСчета",
+
+"base_document_operation_type": "Оплата поставщику",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "СписаниеСРасчетногоСчета",
+
+"contractor_kind": "ЮридическоеЛицо",
+
+"contractor_name": "Земельный фонд Ставропольского края ГКУ СК",
+
+"contractor_inn": "2636218704",
+
+"contractor_kpp": "263601001",
+
+"contract_name": "Договор аренды земельного участка от 01.06.2018 г.",
+
+"contract_number": "",
+
+"article_document_number": "",
+
+"article_document_date": "",
+
+"article_document_found": "false",
+
+"article_name": "",
+
+"article_code": "",
+
+"is_main_asset": "false",
+
+"analytic": "",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "",
+
+"article_group": "",
+
+"article_kind": "",
+
+"store": "",
+
+"department": "",
+
+"company_account_number": "40702810560290100399",
+
+"contractor_account_number": "03100643000000012100",
+
+"row_number": 1,
+
+"qty": 0,
+
+"price": 0,
+
+"sum": 59200,
+
+"article_row_number": 0,
+
+"cash_flow_item_code": "000000121",
+
+"year": "2025",
+
+"cash_flow_details_code": "000000031",
+
+"cash_flow_item_name": "Аренда земли",
+
+"cash_flow_details_name": "Балахоновский  с/с (здания и сооружения)",
+
+"payment_purpose": "Арендная плата за 2025 год по договору № б/н от 01.06.2018 г.; АО \"Сельскохозяйственное предприятие \"Колос\", +ЛС312623230066189",
+
+"payment_purpose_returned": ""
+
+},
+
+{
+
+"number": "000023071",
+
+"date": "01.04.2025 12:07:23",
+
+"is_reverse": "false",
+
+"moving_type": "Расходы",
+
+"base_document_number": "00БП-001174",
+
+"base_document_date": "28.04.2025 23:59:59",
+
+"base_document_kind": "СписаниеСРасчетногоСчета",
+
+"base_document_operation_type": "Оплата поставщику",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "СписаниеСРасчетногоСчета",
+
+"contractor_kind": "ЮридическоеЛицо",
+
+"contractor_name": "Земельный фонд Ставропольского края ГКУ СК",
+
+"contractor_inn": "2636218704",
+
+"contractor_kpp": "263601001",
+
+"contract_name": "Договор аренды земельного участка от 01.06.2018 г.",
+
+"contract_number": "",
+
+"article_document_number": 0,
+
+"article_document_date": "",
+
+"article_document_found": "false",
+
+"article_name": "",
+
+"article_code": "",
+
+"is_main_asset": "false",
+
+"analytic": "",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "",
+
+"article_group": "",
+
+"article_kind": "",
+
+"store": "",
+
+"department": "",
+
+"company_account_number": "40702810560290100399",
+
+"contractor_account_number": "03100643000000012100",
+
+"row_number": 1,
+
+"qty": 1,
+
+"price": 59200,
+
+"sum": 59200,
+
+"article_row_number": 0,
+
+"cash_flow_item_code": "",
+
+"year": "",
+
+"cash_flow_details_code": "",
+
+"cash_flow_item_name": "",
+
+"cash_flow_details_name": "",
+
+"payment_purpose": "Арендная плата за 2025 год по договору № б/н от 01.06.2018 г.; АО \"Сельскохозяйственное предприятие \"Колос\", +ЛС312623230066189",
+
+"payment_purpose_returned": ""
+
+}
+]

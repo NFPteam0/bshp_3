@@ -28,7 +28,7 @@ from ml.data_processing import (
     Shuffler,
     FeatureAdder,
 )
-from tasks import Reader
+from tasks.__init__ import Reader
 from db import db_processor
 from schemas.models import ModelStatuses, ModelTypes
 from settings import (
@@ -518,6 +518,7 @@ class Model(ABC):
 
     async def load(self, uid):
         self.uid = uid
+        logger.info("Loaded pretrained %s models", self.model_type)
 
         self._load_parameters()
 
@@ -538,6 +539,9 @@ class Model(ABC):
         path_to_model = os.path.join(MODEL_FOLDER, self.uid)
         if os.path.isdir(path_to_model):
             shutil.rmtree(path_to_model)
+
+        if USE_DETAILED_LOG:
+            logger.info("Saving models in %s", os.path.join(MODEL_FOLDER, self.uid))
 
         if not without_models:
             for y_col in self.y_columns:
@@ -647,7 +651,6 @@ class ModelManager:
                     ModelTypes(parameters["model_type"]), parameters["base_name"]
                 )
                 await model.load(parameters["uid"])
-
                 # except Exception as e:
                 #     pass
 
@@ -682,17 +685,18 @@ class ModelManager:
     async def write_model(self, model):
         await model.save()
 
-    def get_model(self, model_type=ModelTypes.rf, base_name="all_bases"):
-        logger.info("Get model with params: %s %s", model_type, base_name)
+    def get_model(self, model_type=ModelTypes.rf, base_name="all_bases", log=True):
+        if log:
+            logger.info("Get model with params: %s %s", model_type, base_name)
         model_list = [
             el
             for el in self.models
             if el["model_type"] == model_type and el["base_name"] == base_name
         ]
         if model_list:
-            model = model_list[0]["model"]
+            model = model_list[-1]["model"]
         else:
-            model = self._get_new_model(model_type, base_name)
+            model = self._get_new_model(model_type, base_name)  # TODO: ?
         return model
 
     def _get_new_model(self, model_type=ModelTypes.rf, base_name="") -> type[Model]:
@@ -743,7 +747,7 @@ class ModelManager:
             shutil.rmtree(model_dir)
 
     async def get_info(self, model_type=ModelTypes.rf, base_name=""):
-        model = self.get_model(model_type=model_type, base_name=base_name)
+        model = self.get_model(model_type=model_type, base_name=base_name, log=False)
 
         return {
             "status": model.status,

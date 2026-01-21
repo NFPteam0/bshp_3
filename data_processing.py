@@ -114,7 +114,7 @@ class Checker(BaseEstimator, TransformerMixin):
             raise ValueError(
                 "Fitting dataset is empty. Load more data or change filter."
             )
-        logger.info("Checking data. Done")
+        logger.info("Checking data. Done. Shape, %s", str(X.shape))
         return X
 
 
@@ -131,6 +131,7 @@ class DataEncoder(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
         logger.info("Start encoding data")
+        logger.info("Fit encoder. Shape: %s", str(X.shape))
         logger.info("Form encode dict")
 
         for col in self.columns_to_encode:
@@ -144,7 +145,7 @@ class DataEncoder(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        logger.info("Encoding")
+        logger.info("Encoding, shape: %s", str(X.shape))
         for col in self.columns_to_encode:
             X[col] = X[col].apply(lambda x: self._get_encoded_field(x, col))
 
@@ -152,11 +153,11 @@ class DataEncoder(BaseEstimator, TransformerMixin):
         X["document_month"] = X["date"].apply(self._get_month)
 
         X = X[self.x_columns + self.y_columns]
-        logger.info("Encoding data. Done")
+        logger.info("Encoding data. Done. Shape: %s", str(X.shape))
         return X
 
     def inverse_transform(self, X):
-        logger.info("Start decoding data")
+        logger.info("Start decoding data. Shape: %s", str(X.shape))
         self.decode_dict = {}
         for col in self.encode_dict:
             d = {v: k for k, v in self.encode_dict[col].items()}
@@ -164,7 +165,7 @@ class DataEncoder(BaseEstimator, TransformerMixin):
 
         for col in self.columns_to_encode:
             X[col] = X[col].apply(lambda x: self._get_decoded_field(x, col))
-        logger.info("Decoding data. Done")
+        logger.info("Decoding data. Done. Shape: %s", str(X.shape))
         return X
 
     def _get_decoded_field(self, value, field):
@@ -208,7 +209,7 @@ class NanProcessor(BaseEstimator, TransformerMixin):
         logger.info("Start processing Nan values")
         x[self.str_columns] = x[self.str_columns].fillna("")
         x[self.float_columns] = x[self.float_columns].fillna(0)
-        logger.info("Processing Nan values. Done")
+        logger.info("Done Processing Nan values. Shape:  %s", str(x.shape))
         return x
 
 

@@ -1,3 +1,4 @@
+import pandas as pd
 from pydantic import BaseModel, field_validator
 from enum import Enum
 from datetime import datetime
@@ -19,7 +20,7 @@ class DataRow(BaseModel):
     kind: str
     company_inn: str
     company_kpp: str
-    base_document_number: str
+    base_document_number: str | int
     base_document_date: datetime
     base_document_kind: str
     base_document_operation_type: str
@@ -33,23 +34,23 @@ class DataRow(BaseModel):
     analytic: str
     analytic2: str
     analytic3: str
-    article_document_number: str
+    article_document_number: str | int
     article_document_date: datetime
     article_parent: str
     article_group: str
     article_kind: str
-    row_number: int
+    row_number: int | int
     article_row_number: int
     store: str
     department: str
     company_account_number: str
     contractor_account_number: str
     qty: float
-    price: float
-    sum: float
-    cash_flow_item_code: str
-    cash_flow_details_code: str
-    year: str
+    price: float | None
+    sum: float | None
+    cash_flow_item_code: str | None
+    cash_flow_details_code: str | None
+    year: str | None
 
     @field_validator("date", mode="before")
     def check_date(cls, value):
@@ -69,6 +70,18 @@ class DataRow(BaseModel):
 
         return result
 
+    @field_validator("article_row_number", mode="before")
+    def check_article_row_number(cls, value):
+        if not value:
+            return 0
+        elif isinstance(value, str):
+            result = int(value)
+        elif isinstance(value, int):
+            result = value
+        else:
+            return 0
+        return result
+
     @field_validator("article_document_date", mode="before")
     def check_article_document_date(cls, value):
         if not value:
@@ -85,6 +98,17 @@ class ExtDataRow(DataRow):
     cash_flow_details_name: str | None = None
     cash_flow_item_name: str | None = None
     payment_purpose: str | None = None
+    payment_purpose_returned: str | None = None
+    contract_name: str | None = None
+    contract_number: str | None = None
+    accepted_issued: str | None = None
+
+
+class MetadataCb(Enum):
+    x: tuple[str] = ""
+    y: tuple[str] = ""
+    txt: tuple[str] = ""
+    cat: tuple[str] = ""
 
 
 class EmbedPredictionsRow(BaseModel):
@@ -111,3 +135,4 @@ class ModelTypes(str, Enum):
     rf = "rf"
     catboost = "catboost"
     fstxt = "fasttext"
+    catboost_txt = "catboost+"

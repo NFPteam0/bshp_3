@@ -8,8 +8,9 @@ from datetime import datetime
 import time
 import os
 
+from schemas.models import ModelStatuses
 from settings import SOURCE_FOLDER, TEMP_FOLDER
-from api_types import TaskData, StatusResponse, ProcessingTaskResponse
+from schemas.tasks import TaskData, StatusResponse, ProcessingTaskResponse
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +60,12 @@ class TaskManager:
             return None
 
         return StatusResponse(
-            status=task.status,
-            end_time=task.end_time,
-            error=task.error
+            status=task.status, end_time=task.end_time, error=task.error
         )
 
-    async def save_upload_file(self, task_id: str, filename: str, content: bytes) -> Path:
+    async def save_upload_file(
+        self, task_id: str, filename: str, content: bytes
+    ) -> Path:
         """Saves loaded file"""
 
         if not os.path.isdir(SOURCE_FOLDER):
@@ -78,7 +79,7 @@ class TaskManager:
                 f.write(content)
 
         logger.info(f"Saved uploaded file: {file_path}")
-        return file_path # type: ignore
+        return file_path  # type: ignore
 
     async def cleanup_task_files(self, task_id: str) -> None:
         """Cleanup temp files."""
@@ -89,7 +90,12 @@ class TaskManager:
 
         for pattern in patterns:
             # For directories without wildcards
-            if pattern.name and '*' not in pattern.name and pattern.exists() and pattern.is_dir():
+            if (
+                pattern.name
+                and "*" not in pattern.name
+                and pattern.exists()
+                and pattern.is_dir()
+            ):
                 try:
                     shutil.rmtree(pattern)
                     logger.info(f"Removed directory: {pattern}")

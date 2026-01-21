@@ -1,0 +1,190 @@
+[
+{
+
+"number": "000021732",
+
+"date": "01.01.2025 12:01:25",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "00БП-000011",
+
+"base_document_date": "21.01.2025 9:49:08",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ФизическоеЛицо",
+
+"contractor_name": "Население",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "Основной договор (покупатели)",
+
+"contract_number": "",
+
+"article_document_number": "",
+
+"article_document_date": "",
+
+"article_document_found": "false",
+
+"article_name": "",
+
+"article_code": "",
+
+"is_main_asset": "false",
+
+"analytic": "",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "",
+
+"article_group": "",
+
+"article_kind": "",
+
+"store": "",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 1,
+
+"qty": 1,
+
+"price": 12000,
+
+"sum": 12000,
+
+"article_row_number": 0,
+
+"cash_flow_item_code": "000000185",
+
+"year": "2024",
+
+"cash_flow_details_code": "000000242",
+
+"cash_flow_item_name": "горох",
+
+"cash_flow_details_name": "Горох",
+
+"payment_purpose": "Горох 2 сорт 2021 -10 ц.",
+
+"payment_purpose_returned": ""
+
+},
+
+
+{
+
+"number": "000021732",
+
+"date": "01.01.2025 12:01:25",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "00БП-000011",
+
+"base_document_date": "21.01.2025 9:49:08",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ФизическоеЛицо",
+
+"contractor_name": "Население",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "Основной договор (покупатели)",
+
+"contract_number": "",
+
+"article_document_number": 0,
+
+"article_document_date": "",
+
+"article_document_found": "false",
+
+"article_name": "",
+
+"article_code": "",
+
+"is_main_asset": "false",
+
+"analytic": "",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "",
+
+"article_group": "",
+
+"article_kind": "",
+
+"store": "",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 1,
+
+"qty": 1,
+
+"price": 12000,
+
+"sum": 12000,
+
+"article_row_number": 0,
+
+"cash_flow_item_code": "",
+
+"year": "",
+
+"cash_flow_details_code": "",
+
+"cash_flow_item_name": "",
+
+"cash_flow_details_name": "",
+
+"payment_purpose": "Горох 2 сорт 2021 -10 ц.",
+
+"payment_purpose_returned": ""
+
+}
+]

@@ -201,7 +201,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "learning_rate": [
                 # lr,
                 #   0.002,
-                0.017,
+                # 0.017,
                 None,
             ],
             "depth": [6],
@@ -213,7 +213,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # 200,
                 #   400,
             ],
-            "l2_leaf_reg": [4],
+            "l2_leaf_reg": [4, 1],
         }
 
         best_score = 0

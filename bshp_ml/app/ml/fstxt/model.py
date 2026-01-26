@@ -346,7 +346,7 @@ class FastTextModel(Model):
         return np.sum(v, axis=0)
 
     @staticmethod
-    @lru_cache(maxsize=20_000)
+    @lru_cache(maxsize=None)
     def wv_cached(word: str, base_name: str, model_type: str):
         model_manager = get_model_manager()
         model = model_manager.get_model(model_type, base_name, log=False)

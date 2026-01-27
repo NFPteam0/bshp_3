@@ -213,7 +213,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # 200,
                 #   400,
             ],
-            "l2_leaf_reg": [4, 1],
+            "l2_leaf_reg": [4],
         }
 
         best_score = 0

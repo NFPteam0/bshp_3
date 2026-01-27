@@ -48,7 +48,7 @@ async def fit(
     background_tasks: BackgroundTasks,
     token: str = Depends(get_token_from_header),
     # authenticated: bool = Depends(check_token),
-    base_name: str = Query(default="all_bases"),
+    base_name: str = Query(default=""),
     parameters: dict = Body(),
     model_manager: ModelManager = Depends(get_model_manager),
     fit_embeddings: bool = False,
@@ -56,9 +56,6 @@ async def fit(
         default=ModelTypes.catboost_txt
     ),  # ни на что не влияет, всегда эта модель
 ):
-    if not base_name:
-        base_name = "all_bases"
-        logger.info("No base name provided, switching to %s", base_name)
     parameters["calculate_metrics"] = False  # TODO: forced
     # 1. Fit embeddings first
     if fit_embeddings:
@@ -92,7 +89,6 @@ async def fit(
     task_id = str(uuid.uuid4())
     task = await task_manager.create_task(task_id)
     try:
-        # TODO: долго
         X_y = await _read_dataset({"data_filter": {"base_name": base_name}})
         if USE_DETAILED_LOG:
             logging.info("Loading columns: %s, %s", X_y.columns, X_y.shape)
@@ -157,8 +153,6 @@ async def predict(
         default=ModelTypes.catboost_txt
     ),  # ни на что не влияет, всегда эта модель
 ):
-    if not base_name:
-        base_name = "all_bases"
     # 1. Predict values with embeddings and pass it to catboost model
     try:
         fsttext = model_manager.get_model(ModelTypes.fstxt, "all_bases")

@@ -39,7 +39,7 @@ def prepare_sentences(df: pd.DataFrame, txt_cols) -> list[list[str]]:
         if col in df_txt.columns:
             if col == "payment_purpose" or col == "payment_purpose_returned":
                 df_txt[col] = df_txt[col].str.replace(RE_NUMBERS, " ", regex=True)
-            df_txt[col] = (df_txt[col] + " ") * 20
+            df_txt[col] = df_txt[col] + " "
 
     # df_txt = df_txt[HIGH_IMP].agg(" ".join, axis=1)
     df_txt = df_txt.agg(" ".join, axis=1)

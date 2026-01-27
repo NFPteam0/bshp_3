@@ -56,7 +56,9 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
 
             self.df = uniq.rename({y: "code1c", f"{y}_norm": "code_norm"}, axis=1)
         else:
-            uniq = X[[y, name]].drop_duplicates(keep="first").reset_index(drop=True)
+            uniq = (X.drop_duplicates(subset=y, keep="first").copy())[
+                [y, name]
+            ].reset_index(drop=True)
             uniq[f"{y}_norm"] = uniq.index.astype(int)
 
             self.df = uniq.rename(

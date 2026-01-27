@@ -767,5 +767,5 @@ def init_manager() -> ModelManager:
     return model_manager
 
 
-def get_model_manager():
+def get_model_manager() -> ModelManager:
     return model_manager

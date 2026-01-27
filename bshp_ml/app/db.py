@@ -81,7 +81,7 @@ class DBProcessor:
     ) -> list[dict]:
         collection = self._get_collection(collection_name)
 
-        c_filter = db_filter if db_filter else None
+        c_filter = db_filter if db_filter and db_filter.get("base_name") else {}
         if batch_size:
             cursor = collection.find(
                 c_filter, projection={"_id": False}, batch_size=1000

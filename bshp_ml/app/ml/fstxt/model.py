@@ -346,14 +346,14 @@ class FastTextModel(Model):
         return np.sum(v, axis=0)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=20_000)
     def wv_cached(word: str, base_name: str, model_type: str):
         model_manager = get_model_manager()
         model = model_manager.get_model(model_type, base_name, log=False)
         return model._model.wv[word]
 
     @staticmethod
-    @lru_cache()
+    @lru_cache(maxsize=1000)
     def sentence_vector_cached(words: tuple[str], base_name: str, model_type: str):
         v = [FastTextModel.wv_cached(word, base_name, model_type) for word in words]
         return np.mean(v, axis=0)

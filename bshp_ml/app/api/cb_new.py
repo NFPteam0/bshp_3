@@ -153,8 +153,6 @@ async def predict(
         default=ModelTypes.catboost_txt
     ),  # ни на что не влияет, всегда эта модель
 ):
-    if not base_name:
-        base_name = "all_bases"
     # 1. Predict values with embeddings and pass it to catboost model
     try:
         fsttext = model_manager.get_model(ModelTypes.fstxt, "all_bases")

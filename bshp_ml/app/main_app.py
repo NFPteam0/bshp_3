@@ -318,8 +318,7 @@ async def get_model_info(
 ) -> ModelInfo:
     try:
         model_type = ModelTypes.catboost_txt
-        if not base_name:
-            base_name = "all_bases"
+
         result = await model_manager.get_info(
             model_type=model_type.value, base_name=base_name
         )

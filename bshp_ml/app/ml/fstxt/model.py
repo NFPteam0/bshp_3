@@ -206,7 +206,7 @@ class FastTextModel(Model):
             raise e
         # predict_detail
         # self.status != ModelStatuses.READY?
-        if set_from:
+        if set_from is not None:
             try:
                 set_from = pipeline.fit_transform(set_from)
             except ValueError as e:

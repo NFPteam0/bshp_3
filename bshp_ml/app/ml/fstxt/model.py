@@ -1,5 +1,6 @@
 import copy
 from functools import lru_cache
+import gc
 import json
 import logging
 import os
@@ -177,7 +178,11 @@ class FastTextModel(Model):
         )
 
     async def predict(
-        self, X_api: dict | list[dict], for_metrics=False, set_classes: bool = False
+        self,
+        X_api: dict | list[dict],
+        for_metrics=False,
+        set_classes: bool = False,
+        set_from: dict = None,
     ) -> dict[str, EmbedPredictionsRow]:
         X = pd.DataFrame(X_api)
         if USE_DETAILED_LOG:
@@ -193,7 +198,7 @@ class FastTextModel(Model):
 
         pipeline = Pipeline(pipeline_list)
         if USE_DETAILED_LOG:
-            logger.warning("Predict empty data? Shape %s", X.shape)
+            logger.warning("Predicting, Shape %s", X.shape)
         try:
             X = pipeline.fit_transform(X)
         except ValueError as e:
@@ -201,8 +206,18 @@ class FastTextModel(Model):
             raise e
         # predict_detail
         # self.status != ModelStatuses.READY?
+        if set_from is not None:
+            try:
+                set_from = pipeline.fit_transform(set_from)
+            except ValueError as e:
+                logger.error("Can't transform empty data: X(%s)", set_from.shape)
+                raise e
+        else:
+            set_from = X
         if set_classes:
-            self.all_classes_names = {col: X[col].unique() for col in self.y_columns}
+            self.all_classes_names = {
+                col: set_from[col].unique() for col in self.y_columns
+            }
             # TODO: коды сюда?
             if USE_DETAILED_LOG:
                 logger.info(
@@ -215,7 +230,12 @@ class FastTextModel(Model):
                 "year": "year",
             }
             self.all_classes_codes = {
-                col: dict(zip(X[col].unique(), X[self.name2code[col]].astype(int)))
+                col: dict(
+                    zip(
+                        set_from[col].unique(),
+                        set_from[self.name2code[col]].astype(int),
+                    )
+                )
                 for col in self.y_columns
             }
         if self.all_classes_names is None or self.all_classes_codes is None:
@@ -357,6 +377,64 @@ class FastTextModel(Model):
     def sentence_vector_cached(words: tuple[str], base_name: str, model_type: str):
         v = [FastTextModel.wv_cached(word, base_name, model_type) for word in words]
         return np.mean(v, axis=0)
+
+    def build_class_matrix(self, classes, codes):
+        vectors = []
+        names = []
+        for cls in classes:
+            tokens = tuple((cls.lower() + str(codes[cls])).split())
+            vec = self.sentence_vector_cached(tokens, self.base_name, self.model_type)
+            vectors.append(vec)
+            names.append(cls)
+
+        M = np.vstack(vectors).astype(np.float32)
+
+        M /= np.linalg.norm(M, axis=1, keepdims=True) + 1e-9
+
+        return M, names
+
+    def batched_predict(
+        self,
+        sentences,
+        class_matrix,
+        class_names,
+        chunk_size=2**12,
+    ):
+        n = len(sentences)
+
+        pred_labels = []
+        pred_probs = []
+
+        for start in range(0, n, chunk_size):
+            end = min(start + chunk_size, n)
+
+            chunk = sentences[start:end]
+
+            X = np.vstack(
+                [
+                    self.sentence_vector_cached(
+                        tuple(s), self.base_name, self.model_type
+                    )
+                    for s in chunk
+                ]
+            ).astype(np.float32)
+
+            X /= np.linalg.norm(X, axis=1, keepdims=True) + 1e-9
+
+            sims = X @ class_matrix.T
+
+            idx = sims.argmax(axis=1)
+            probs = sims.max(axis=1)
+
+            pred_labels.extend(class_names[i] for i in idx)
+            pred_probs.extend(probs.tolist())
+
+            del X, sims
+            gc.collect()
+            if USE_DETAILED_LOG:
+                logging.info(f"BATCH ready {start // chunk_size + 1}")
+
+        return pred_labels, pred_probs
 
     def _save_column_model(self, column, item=None):
         # TODO:

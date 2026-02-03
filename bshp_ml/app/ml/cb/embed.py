@@ -79,6 +79,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "cash_flow_details_code",
             "contract_name",  # TODO: number?
             "accepted_issued",
+            "article_parent",
         ]
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])

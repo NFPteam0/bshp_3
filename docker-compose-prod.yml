@@ -3,7 +3,7 @@ version: "3"
 services:
   app:
     container_name: bshp_v3
-    image: dark_h14/bshp_v3:latest
+    image: dark_h14/bshp_v3:prod
     environment:
       - DB_HOST=db
       - DB_PORT=27017
@@ -12,12 +12,11 @@ services:
       - DATASET_BATCH_LENGTH=200000
       - QUANTIZE=true        
     build:
-        context: ./bshp_ml
-        dockerfile: Dockerfile   
+        context: .
+        dockerfile: bshp_ml/Dockerfile.prod  
     ports:
       - "8061:8061"
     volumes:
-      - ./bshp_ml/app:/app
       - ./models:/models
     networks:
       - custom

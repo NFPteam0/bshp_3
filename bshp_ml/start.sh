@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-if [ -z "$(ls -A /models)" ]; then
+if [ -z "$(ls -A /models/pretrained)" ]; then
 echo "No models found. Loading basic text model..."
 mv /_models/* /models
 fi

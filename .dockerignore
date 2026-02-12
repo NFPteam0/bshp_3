@@ -7,7 +7,7 @@
 *.env
 *.mdl
 
-# **/.git
+**/.git
 __pycache__
 
 /venv
@@ -15,5 +15,5 @@ __pycache__
 /tmp
 /logs
 /.venv
-/.vscode
+.vscode
 **/data

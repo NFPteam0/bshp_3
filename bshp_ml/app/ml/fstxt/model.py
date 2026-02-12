@@ -1,5 +1,7 @@
+import asyncio
 import copy
 from functools import lru_cache
+import gc
 import json
 import logging
 import os
@@ -32,6 +34,8 @@ from settings import (
 
 logging.getLogger("bshp_data_processing_logger").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
+
+BATCH_SIZE = 20_000
 
 
 class FastTextModel(Model):
@@ -108,7 +112,7 @@ class FastTextModel(Model):
         # NOTE: у fasttext есть ивенты из коробки
         self._model = FastText.load(f"{model_folder}/pretrained/fsttxt.model")
 
-    async def _fit(self, df: pd.DataFrame, parameters, is_first=False):
+    def _sync_fit(self, df: pd.DataFrame, parameters, is_first=False):
         if USE_DETAILED_LOG:
             logger.info("{} fit".format("First" if is_first else "continuous"))
         is_first = False  # TODO: ?
@@ -157,6 +161,9 @@ class FastTextModel(Model):
                 epochs=self._model.epochs,
             )
 
+    async def _fit(self, df: pd.DataFrame, parameters, is_first=False):
+        return await asyncio.to_thread(self._sync_fit, df, parameters, is_first)
+
     def _get_all_classes(self, df: pd.DataFrame):
         # TODO: move to fit? no bare prefitted?
         ...
@@ -177,7 +184,22 @@ class FastTextModel(Model):
         )
 
     async def predict(
-        self, X_api: dict | list[dict], for_metrics=False, set_classes: bool = False
+        self,
+        X_api: dict | list[dict],
+        for_metrics=False,
+        set_classes: bool = False,
+        set_from: dict = None,
+    ) -> dict[str, EmbedPredictionsRow]:
+        return await asyncio.to_thread(
+            self._sync_predict, X_api, for_metrics, set_classes, set_from
+        )
+
+    def _sync_predict(
+        self,
+        X_api: dict | list[dict],
+        for_metrics=False,
+        set_classes: bool = False,
+        set_from: dict = None,
     ) -> dict[str, EmbedPredictionsRow]:
         X = pd.DataFrame(X_api)
         if USE_DETAILED_LOG:
@@ -193,7 +215,7 @@ class FastTextModel(Model):
 
         pipeline = Pipeline(pipeline_list)
         if USE_DETAILED_LOG:
-            logger.warning("Predict empty data? Shape %s", X.shape)
+            logger.warning("Predicting, Shape %s", X.shape)
         try:
             X = pipeline.fit_transform(X)
         except ValueError as e:
@@ -201,8 +223,18 @@ class FastTextModel(Model):
             raise e
         # predict_detail
         # self.status != ModelStatuses.READY?
+        if set_from is not None:
+            try:
+                set_from = pipeline.fit_transform(set_from)
+            except ValueError as e:
+                logger.error("Can't transform empty data: X(%s)", set_from.shape)
+                raise e
+        else:
+            set_from = X
         if set_classes:
-            self.all_classes_names = {col: X[col].unique() for col in self.y_columns}
+            self.all_classes_names = {
+                col: set_from[col].unique() for col in self.y_columns
+            }
             # TODO: коды сюда?
             if USE_DETAILED_LOG:
                 logger.info(
@@ -215,7 +247,12 @@ class FastTextModel(Model):
                 "year": "year",
             }
             self.all_classes_codes = {
-                col: dict(zip(X[col].unique(), X[self.name2code[col]].astype(int)))
+                col: dict(
+                    zip(
+                        set_from[col].unique(),
+                        set_from[self.name2code[col]].astype(int),
+                    )
+                )
                 for col in self.y_columns
             }
         if self.all_classes_names is None or self.all_classes_codes is None:
@@ -240,102 +277,27 @@ class FastTextModel(Model):
             "cash_flow_details_name",
             "year",
         ]
-        tmp_cols = []
-        all_sentences = prepare_sentences(
-            X, [col for col in self.str_columns if col not in UNFEATURED] + tmp_cols
+
+        sentences = prepare_sentences(
+            X,
+            [
+                col
+                for col in self.str_columns
+                if col not in UNFEATURED and col not in self.y_columns
+            ],
         )
-        sentences = all_sentences
-        result = {}
+
         for y in self.y_columns:
-            res = []
-            sentences_i = None
-            if y == "cash_flow_details_name":
-                # result.get("cash_flow_item_name")
-                tmp_cols.append("pred_cash_flow_item_name")
-
-                if "pred_cash_flow_item_name" in X.columns:
-                    # sentences_i = prepare_sentences(X, tmp_cols)
-                    sentences_i = prepare_sentences(
-                        X,
-                        [col for col in self.str_columns if col not in UNFEATURED]
-                        + tmp_cols,
-                    )
-                else:
-                    logger.warning("No predictions for items")
-                if sentences_i:
-                    sentences = [
-                        sent + sent_i for sent, sent_i in zip(sentences, sentences_i)
-                    ]
-            else:
-                sentences = all_sentences
-            all_classes_names = self.all_classes_names[y]
-            if USE_DETAILED_LOG:
-                logging.info("Predicting %s", y)
-                logging.info("Overall classes %d", len(self.all_classes_names[y]))
-                logging.info("Feed model with %d txt columns", len(X.columns))
-            # wordvec = {cls: self._model.wv[cls] for cls in all_classes_names}
-            # wordvec = {
-            #     cls + str(self.all_classes_codes[y][cls]): self._model.wv[
-            #         cls + str(self.all_classes_codes[y][cls])
-            #     ]
-            #     for cls in all_classes_names
-            # }
-            wordvec = {
-                cls + str(self.all_classes_codes[y][cls]): self.sentence_vector_cached(
-                    tuple((cls.lower() + str(self.all_classes_codes[y][cls])).split()),
-                    self.base_name,
-                    self.model_type,
-                )
-                for cls in all_classes_names
-            }
-            word2name = {
-                cls + str(self.all_classes_codes[y][cls]): cls
-                for cls in all_classes_names
-            }
-            vectors = np.vstack(list(wordvec.values()))
-            words = list(wordvec.keys())
-            words = [word2name[word] for word in words]
-            # TODO: add validation?
-            for sentence in sentences:
-                # target_vector = self.sentence_vector(sentence, self._model.wv)
-                # TODO: тут 10 * article_name
-                target_vector = self.sentence_vector_cached(
-                    tuple(sentence), self.base_name, self.model_type
-                )
-
-                similarities = self._model.wv.cosine_similarities(
-                    target_vector, vectors
-                )
-
-                max_index = similarities.argmax()
-                top_match = EmbedPredictionsRow(
-                    pred_label=words[max_index],
-                    pred_prob=float(similarities[max_index]),
-                )
-
-                res.append(top_match)
-
-            # detpred = res
-            # predictions = pd.DataFrame(detpred, columns=["pred_label", "pred_prob"])
-            # txt_cols.extend(["pred_label", "base_document_number"])
-            # df["pred_num"] = df["pred_label"].map({v: k for k, v in det_name_map.items()})
-            # return predictions.to_json(orient="records")
-
-            result[y] = res
-
-            X = pd.concat(
-                [
-                    X,
-                    pd.DataFrame(
-                        {
-                            f"pred_{y}": [item.pred_label for item in res],
-                            f"prob_{y}": [item.pred_prob for item in res],
-                        }
-                    ),
-                ],
-                axis=1,
-                ignore_index=False,
+            class_matrix, class_names = self.build_class_matrix(
+                self.all_classes_names[y], self.all_classes_codes[y]
             )
+
+            preds, probs = self.batched_predict(
+                sentences, class_matrix, class_names, BATCH_SIZE
+            )
+            X[f"pred_{y}"] = preds
+            X[f"prob_{y}"] = probs
+            gc.collect()
 
         return X.to_json(
             orient="records", force_ascii=False, date_format="iso", date_unit="s"
@@ -357,6 +319,64 @@ class FastTextModel(Model):
     def sentence_vector_cached(words: tuple[str], base_name: str, model_type: str):
         v = [FastTextModel.wv_cached(word, base_name, model_type) for word in words]
         return np.mean(v, axis=0)
+
+    def build_class_matrix(self, classes, codes):
+        vectors = []
+        names = []
+        for cls in classes:
+            tokens = tuple((cls.lower() + str(codes[cls])).split())
+            vec = self.sentence_vector_cached(tokens, self.base_name, self.model_type)
+            vectors.append(vec)
+            names.append(cls)
+
+        M = np.vstack(vectors).astype(np.float32)
+
+        M /= np.linalg.norm(M, axis=1, keepdims=True) + 1e-9
+
+        return M, names
+
+    def batched_predict(
+        self,
+        sentences,
+        class_matrix,
+        class_names,
+        chunk_size=2**12,
+    ):
+        n = len(sentences)
+
+        pred_labels = []
+        pred_probs = []
+
+        for start in range(0, n, chunk_size):
+            end = min(start + chunk_size, n)
+
+            chunk = sentences[start:end]
+
+            X = np.vstack(
+                [
+                    self.sentence_vector_cached(
+                        tuple(s), self.base_name, self.model_type
+                    )
+                    for s in chunk
+                ]
+            ).astype(np.float32)
+
+            X /= np.linalg.norm(X, axis=1, keepdims=True) + 1e-9
+
+            sims = X @ class_matrix.T
+
+            idx = sims.argmax(axis=1)
+            probs = sims.max(axis=1)
+
+            pred_labels.extend(class_names[i] for i in idx)
+            pred_probs.extend(probs.tolist())
+
+            del X, sims
+            gc.collect()
+            if USE_DETAILED_LOG:
+                logging.info(f"Fasttext model BATCH {start // chunk_size + 1} ready ")
+
+        return pred_labels, pred_probs
 
     def _save_column_model(self, column, item=None):
         # TODO:

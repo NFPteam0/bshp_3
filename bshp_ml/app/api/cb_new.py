@@ -58,6 +58,7 @@ async def fit(
 ):
     parameters["calculate_metrics"] = False  # TODO: forced
     # 1. Fit embeddings first
+    # TODO: 404 модель не найдена
     if fit_embeddings:
         task_id = str(uuid.uuid4())
         task = await task_manager.create_task(task_id)
@@ -155,8 +156,22 @@ async def predict(
 ):
     # 1. Predict values with embeddings and pass it to catboost model
     try:
+        dataset = await _read_dataset({"data_filter": {"base_name": base_name}})
+        if USE_DETAILED_LOG:
+            logging.info("Loading columns: %s, %s", dataset.columns, dataset.shape)
+        if dataset.empty:
+            raise ValueError
+    except Exception as e:
+        print(traceback.format_exc())
+        logger.error(
+            f"Collection not found. Please, insure base {base_name} is loaded: {e}"
+        )
+        raise HTTPException(status_code=404, detail=str(e))
+    try:
         fsttext = model_manager.get_model(ModelTypes.fstxt, "all_bases")
-        Xy_embed = await fsttext.predict(jsonable_encoder(X))
+        Xy_embed = await fsttext.predict(
+            jsonable_encoder(X), set_classes=True, set_from=dataset
+        )
         Xy_json = json.loads(Xy_embed)
     except Exception as e:
         print(traceback.format_exc())

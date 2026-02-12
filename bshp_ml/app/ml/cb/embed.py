@@ -1,3 +1,4 @@
+import asyncio
 import gc
 import json
 import logging
@@ -79,6 +80,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "cash_flow_details_code",
             "contract_name",  # TODO: number?
             "accepted_issued",
+            "article_parent",
         ]
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])
@@ -538,6 +540,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
             self._save_cb_model(model_i, y)
 
     async def _fit(self, df: pd.DataFrame, parameters: dict, is_first=True):
+        return await asyncio.to_thread(self.__sync_fit, df, parameters, is_first)
+
+    def __sync_fit(self, df: pd.DataFrame, parameters: dict, is_first=True):
         is_first = True  # TODO: ?
         if USE_DETAILED_LOG:
             logger.info("{} fit".format("First" if is_first else "continuous"))
@@ -616,6 +621,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
         model.save_model(path)
 
     async def predict(self, X: pd.DataFrame, for_metrics=False):
+        return await asyncio.to_thread(self._sync_predict, X, for_metrics)
+
+    def _sync_predict(self, X: pd.DataFrame, for_metrics=False):
         if not for_metrics and self.status != ModelStatuses.READY:
             raise ValueError("Model is not ready. Fit it before.")
         # load for details code

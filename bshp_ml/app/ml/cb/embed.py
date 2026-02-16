@@ -141,9 +141,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
         model = None
         model_new = None
 
-        # test_pool = self.get_test_pool(
-        #     df_test=df_test, y=y, to_drop=to_drop, cat_idxs=cat_idxs
-        # )
         BSIZE = 10_000
         for n, batch in enumerate(
             self.get_batch_pool(
@@ -257,11 +254,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     )
 
                     # Оцениваем accuracy на тестовой выборке
-                    # test_pool = Pool(
-                    #     X_test,
-                    #     label=y_test,
-                    #     cat_features=cat_idxs,
-                    # )
                     preds = current_model.predict(test_pool, prediction_type="Class")
                     acc, f1 = eval_model(df_test[f"{y}"], preds)
                     if USE_DETAILED_LOG:
@@ -286,8 +278,14 @@ class CatBoostModelEmbeddings(CatBoostModel):
             logger.info(f"Predict {len(df[y])} records")
 
         bscores = []
-        # total_preds = pd.DataFrame(index=df.index)
+
         df = df.copy()
+        # TODO: fsttxt class feature
+        # TODO: article_parent rm numbers
+        df["article_parent"].str.replace(
+            "r.[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True
+        ).str.strip()
+
         UNFEATURED = [
             "company_inn",
             "contractor_name",
@@ -436,10 +434,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         else:
             if USE_DETAILED_LOG:
                 logger.info(f"Found {len(df[y])} records")
-            # det_map1 = {name: num for num, name in enumerate(df[y].unique())}
-            # det_unmap1 = {v: k for k, v in det_map1.items()}
 
-            # df[f"{y}_norm"] = df[y].copy().map(det_map1)
             encoder = CBDataEncoder(
                 parameters=self.parameters,
                 y_col=y,
@@ -476,23 +471,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                 this_label = all_data[f"{y}_norm"].iloc[0]
                 bscores.extend([1 for _ in range(len(df[f"{y}_norm"]))])
-                # total_preds.loc[df.index, f"{y}_pred"] = [
-                #     this_label for _ in range(len(df))
-                # ]
-                # (f"Only one {y} code, no need for model")
                 self.strict_acc[y] = this_label
                 return
-            # if y == "year":
-            #     year_mask = df.groupby(ITEM)[f"{ITEM}"].apply(
-            #         lambda x: ((x.str.strip() != "") & (x != -1)).any()
-            #     )
-            #     self.items_wo_year = set(year_mask[~year_mask].index.astype(int))
-            #     if USE_DETAILED_LOG:
-            #         logging.info(
-            #             "Items without year: %s,\n Items with year: %s",
-            #             len(self.items_wo_year),
-            #             len(set(year_mask[year_mask].index.astype(int))),
-            #         )
 
             # X, y train
             df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
@@ -649,8 +629,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
         for y in self.y_columns:
             X[y] = ""
         # set_config(transform_output="pandas")
+        X = (
+            X["article_parent"]
+            .str.replace("r.[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+            .str.strip()
+        )
         X_y = pipeline.fit_transform(X).copy()
-
         # c_x_columns = self.x_columns + [
         #     "number",
         #     "date",

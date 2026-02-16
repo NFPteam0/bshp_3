@@ -1,0 +1,94 @@
+[]
+{
+
+"number": "000022165",
+
+"date": "01.03.2025 12:00:06",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "00БП-000036",
+
+"base_document_date": "05.03.2025 8:56:09",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ФизическоеЛицо",
+
+"contractor_name": "Население",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "Основной договор (покупатели)",
+
+"contract_number": "",
+
+"article_document_number": "0000-001424",
+
+"article_document_date": "01.10.2021 0:00:00",
+
+"article_document_found": "true",
+
+"article_name": "Отходы подсолнечника 2021",
+
+"article_code": "00-00011513",
+
+"is_main_asset": "false",
+
+"analytic": "Отходы подсолнечника 2021",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "2021",
+
+"article_group": "",
+
+"article_kind": "Продукция растениеводства",
+
+"store": "Зерносклад (Балахоновский)",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 1,
+
+"qty": 3,
+
+"price": 15000,
+
+"sum": 45000,
+
+"article_row_number": 1,
+
+"cash_flow_item_code": "000000184",
+
+"year": "2024",
+
+"cash_flow_details_code": "000000241",
+
+"cash_flow_item_name": "оз. ячмень",
+
+"cash_flow_details_name": "Озимый ячмень",
+
+"payment_purpose": "Озимый ячмень 2024 - 3000 кг.",
+
+"payment_purpose_returned": ""
+
+}]

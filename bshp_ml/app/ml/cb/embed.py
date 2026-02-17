@@ -219,7 +219,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
-                # 100,
+                100,
                 # 200,
                 #   400,
             ],

@@ -294,7 +294,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         # TODO: fsttxt class feature
         # TODO: article_parent rm numbers
         df["article_parent"].str.replace(
-            "r.[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True
+            r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True
         ).str.strip()
 
         UNFEATURED = [
@@ -640,9 +640,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
         for y in self.y_columns:
             X[y] = ""
         # set_config(transform_output="pandas")
-        X = (
+        X["article_parent"] = (
             X["article_parent"]
-            .str.replace("r.[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
             .str.strip()
         )
         X_y = pipeline.fit_transform(X).copy()

@@ -183,7 +183,7 @@ class NanProcessor(BaseEstimator, TransformerMixin):
         :param x: data before nan processing
         :return: data after na  processing
         """
-        x = x.copy()
+        x = pd.DataFrame(x.copy())
         if USE_DETAILED_LOG:
             logger.info("Start processing Nan values")
         self.str_columns = [col for col in self.str_columns if col in x.columns]

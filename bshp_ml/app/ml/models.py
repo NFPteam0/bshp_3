@@ -618,7 +618,7 @@ class ModelManager:
 
                     model = None
 
-                    model = self._get_new_model(ModelTypes.fstxt, "all_bases")
+                    model = self._get_new_model(ModelTypes.extfstxt, "all_bases")
                     await model.load(uid=str(uuid.uuid4))
 
                     if model:

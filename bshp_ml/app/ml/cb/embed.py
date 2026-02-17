@@ -85,6 +85,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])
         self.categorical.extend([f"pred_{y}" for y in self.fsttxt_columns])
+
+        self.categorical.extend([f"pred_pp_{y}" for y in self.fsttxt_columns])
+        self.float_columns.extend([f"prob_pp_{y}" for y in self.fsttxt_columns])
         self.str_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
             + [
@@ -209,8 +212,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
         param_grid = {
             "learning_rate": [
                 # lr,
-                #   0.002,
-                # 0.017,
                 None,
             ],
             "depth": [6],
@@ -218,7 +219,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
-                100,
+                # 100,
                 # 200,
                 #   400,
             ],

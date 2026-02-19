@@ -75,14 +75,14 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         if self.name_col:
             if USE_DETAILED_LOG:
                 logger.info(
-                    "Pre Encoded dict: %s, %s : %s",
+                    "Pre Encoded dict: %s, %s : %s (%s)",
                     X[f"pred_{self.name_col}"].iloc[0],
                     X[f"pred_pp_{self.name_col}"].iloc[0],
                     list(self.name2code.keys())[0],
                     list(self.name2code.values())[0],
                 )
                 logger.info(
-                    "Len of pred_name classes: %s",
+                    "Len of pred_name classes: %s %s",
                     len(X[f"pred_{self.name_col}"].unique()),
                     len(X[f"pred_pp_{self.name_col}"].unique()),
                 )
@@ -95,14 +95,14 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             )
             if USE_DETAILED_LOG:
                 logger.info(
-                    "Encoded dict: %s, %s, %s",
+                    "Encoded dict: %s, %s, %s %s",
                     X[f"pred_{self.name_col}"].iloc[0],
                     X[f"pred_pp_{self.name_col}"].iloc[0],
                     list(self.name2code.keys())[0],
                     list(self.name2code.values())[0],
                 )
                 logger.info(
-                    "Len of pred_name classes: %s",
+                    "Len of pred_name classes: %s %s",
                     len(X[f"pred_{self.name_col}"].unique()),
                     len(X[f"pred_pp_{self.name_col}"].unique()),
                 )

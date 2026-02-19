@@ -74,11 +74,20 @@ class ExtFastTextModel(FastTextModel):
                 col: dict(
                     zip(
                         set_from[col].unique(),
-                        set_from[self.name2code[col]].astype(int),
+                        set_from[self.name2code[col]].replace("", -1).astype(int),
                     )
                 )
                 for col in self.y_columns
             }
+            if USE_DETAILED_LOG:
+                for col in self.y_columns:
+                    empty = set_from[self.name2code[col]].isna() | (
+                        set_from[self.name2code[col]].astype(str).str.strip() == ""
+                    )
+                    if empty.any():
+                        logger.warning(
+                            f"Empty {self.name2code[col]} at number={set_from.loc[empty.idxmax(), 'number']}"
+                        )
         if self.all_classes_names is None or self.all_classes_codes is None:
             raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 

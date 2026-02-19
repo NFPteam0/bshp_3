@@ -1150,30 +1150,3 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
     def _load_encoder(self):
         pass
-
-
-# class CbCallBack:
-#     def after_iteration(self, info):
-#         if USE_DETAILED_LOG:
-#             if info.metrics.get("validation"):
-#                 logger.info(
-#                     "{}: - loss = {}, test loss = {}".format(
-#                         info.iteration,
-#                         info.metrics["learn"][list(info.metrics["learn"].keys())[0]][
-#                             -1
-#                         ],
-#                         info.metrics["validation"][
-#                             list(info.metrics["validation"].keys())[0]
-#                         ][-1],
-#                     )
-#                 )
-#             else:
-#                 logger.info(
-#                     "{}: - loss = {}".format(
-#                         info.iteration,
-#                         info.metrics["learn"][list(info.metrics["learn"].keys())[0]][
-#                             -1
-#                         ],
-#                     )
-#                 )
-#         return True

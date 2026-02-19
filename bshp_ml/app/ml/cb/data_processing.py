@@ -25,20 +25,6 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
 
         X = X.copy()
         X[self.y] = X[self.y].astype(int)
-        # if self.y == "year":
-        #     uniq = X.drop_duplicates(subset=self.y).reset_index(drop=True)
-        #     uniq[f"{self.y}_norm"] = uniq.index.astype(int)
-        #     self.df = uniq.rename(
-        #         {self.y: "code1c", f"{self.y}_norm": "code_norm"}, axis=1
-        #     )
-
-        #     self.code2norm = dict(
-        #         zip(self.df["code1c"].astype(int), self.df["code_norm"].astype(int))
-        #     )
-        #     self.norm2code = dict(
-        #         zip(self.df["code_norm"].astype(int), self.df["code1c"].astype(int))
-        #     )
-        #     return self
 
         self.set_mapping(X)
 
@@ -91,27 +77,34 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                 logger.info(
                     "Pre Encoded dict: %s, %s : %s",
                     X[f"pred_{self.name_col}"].iloc[0],
+                    X[f"pred_pp_{self.name_col}"].iloc[0],
                     list(self.name2code.keys())[0],
                     list(self.name2code.values())[0],
                 )
                 logger.info(
                     "Len of pred_name classes: %s",
                     len(X[f"pred_{self.name_col}"].unique()),
+                    len(X[f"pred_pp_{self.name_col}"].unique()),
                 )
 
             X[f"pred_{self.name_col}"] = X[f"pred_{self.name_col}"].replace(
+                self.name2code
+            )
+            X[f"pred_pp_{self.name_col}"] = X[f"pred_pp_{self.name_col}"].replace(
                 self.name2code
             )
             if USE_DETAILED_LOG:
                 logger.info(
                     "Encoded dict: %s, %s, %s",
                     X[f"pred_{self.name_col}"].iloc[0],
+                    X[f"pred_pp_{self.name_col}"].iloc[0],
                     list(self.name2code.keys())[0],
                     list(self.name2code.values())[0],
                 )
                 logger.info(
                     "Len of pred_name classes: %s",
                     len(X[f"pred_{self.name_col}"].unique()),
+                    len(X[f"pred_pp_{self.name_col}"].unique()),
                 )
         X[self.y] = X[self.y].replace(r"^\s*$", None, regex=True).fillna(-1).astype(int)
         # тут

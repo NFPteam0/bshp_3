@@ -250,7 +250,10 @@ class FastTextModel(Model):
                 col: dict(
                     zip(
                         set_from[col].unique(),
-                        set_from[self.name2code[col]].fillna(-1).astype(int),
+                        set_from[self.name2code[col]]
+                        .replace("", -1)
+                        .fillna(-1)
+                        .astype(int),
                     )
                 )
                 for col in self.y_columns

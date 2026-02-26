@@ -105,8 +105,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
         )
         self.x_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
-            + ["payment_purpose", "contract_name", "contract_number", "accepted_issued"]
+            + [
+                "payment_purpose",
+                "contract_name",
+                "contract_number",
+                "accepted_issued",
+                "sin_month",
+                "cos_month",
+            ]
         )
+        self.float_columns.extend(["sin_month", "cos_month"])
         self.columns_to_encode = self.categorical
 
         self.date_columns = [
@@ -310,6 +318,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "row_number",
             "number",
         ]
+        if y != "year":
+            UNFEATURED += ["pred_pp_year", "prob_pp_year", "pred_year", "prob_year"]
+
         df = df.drop(
             labels=[
                 col

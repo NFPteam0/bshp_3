@@ -1,0 +1,925 @@
+openapi: 3.1.0
+info:
+  title: BSHP App
+  version: 3.2.4.4
+paths:
+  /:
+    get:
+      summary: Main Page
+      description: 'Root method returns html ok description
+
+        @return: HTML response with ok micro html'
+      operationId: main_page__get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /health:
+    get:
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: string
+                title: Response Health Health Get
+  /version:
+    get:
+      summary: Version
+      operationId: version_version_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: string
+                title: Response Version Version Get
+  /save_data:
+    post:
+      summary: Save Data
+      operationId: save_data_save_data_post
+      parameters:
+      - name: base_name
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Base Name
+      - name: replace
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Replace
+      - name: token
+        in: header
+        required: true
+        schema:
+          type: string
+          title: Token
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_save_data_save_data_post'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /delete_data:
+    get:
+      summary: Delete Data
+      operationId: delete_data_delete_data_get
+      parameters:
+      - name: base_name
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: Base Name
+      - name: token
+        in: header
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: string
+                title: Response Delete Data Delete Data Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/fit:
+    post:
+      summary: Fit
+      operationId: fit_v1_fit_post
+      parameters:
+      - name: base_name
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: Base Name
+      - name: model_type
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ModelTypes'
+          default: rf
+      - name: token
+        in: header
+        required: true
+        schema:
+          type: string
+          title: Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              title: Parameters
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /delete_model:
+    get:
+      summary: Delete Model
+      operationId: delete_model_delete_model_get
+      parameters:
+      - name: base_name
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: Base Name
+      - name: model_type
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ModelTypes'
+          default: catboost+
+      - name: token
+        in: header
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: string
+                title: Response Delete Model Delete Model Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /get_model_info:
+    get:
+      summary: Get Model Info
+      operationId: get_model_info_get_model_info_get
+      parameters:
+      - name: base_name
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: Base Name
+      - name: model_type
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ModelTypes'
+          default: rf
+      - name: token
+        in: header
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelInfo'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/predict:
+    post:
+      summary: Predict (previous version)
+      operationId: predict_v1_predict_post
+      parameters:
+      - name: base_name
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: Base Name
+      - name: model_type
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ModelTypes'
+          default: rf
+      - name: token
+        in: header
+        required: true
+        schema:
+          type: string
+          title: Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/DataRow'
+              title: X
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataRow'
+                title: Response Predict V1 Predict Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /get_task_status:
+    get:
+      summary: Get Task Status
+      operationId: get_task_status_get_task_status_get
+      parameters:
+      - name: task_id
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Task Id
+      - name: token
+        in: header
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /fit:
+    post:
+      summary: Fit
+      operationId: fit_fit_post
+      parameters:
+      - name: base_name
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: Base Name
+      - name: fit_embeddings
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Fit Embeddings
+      - name: model_type
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ModelTypes'
+          default: catboost+
+      - name: token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              title: Parameters
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /predict:
+    post:
+      summary: Predict
+      operationId: predict_predict_post
+      parameters:
+      - name: base_name
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: Base Name
+      - name: model_type
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ModelTypes'
+          default: catboost+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExtDataRow'
+              title: X
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    Body_save_data_save_data_post:
+      properties:
+        file:
+          type: string
+          format: binary
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_save_data_save_data_post
+    DataRow:
+      properties:
+        number:
+          type: string
+          title: Number
+        date:
+          type: string
+          format: date-time
+          title: Date
+        is_reverse:
+          type: boolean
+          title: Is Reverse
+        moving_type:
+          type: string
+          title: Moving Type
+        kind:
+          type: string
+          title: Kind
+        company_inn:
+          type: string
+          title: Company Inn
+        company_kpp:
+          type: string
+          title: Company Kpp
+        base_document_number:
+          anyOf:
+          - type: string
+          - type: integer
+          title: Base Document Number
+        base_document_date:
+          type: string
+          format: date-time
+          title: Base Document Date
+        base_document_kind:
+          type: string
+          title: Base Document Kind
+        base_document_operation_type:
+          type: string
+          title: Base Document Operation Type
+        contractor_name:
+          type: string
+          title: Contractor Name
+        contractor_inn:
+          type: string
+          title: Contractor Inn
+        contractor_kpp:
+          type: string
+          title: Contractor Kpp
+        contractor_kind:
+          type: string
+          title: Contractor Kind
+        article_name:
+          type: string
+          title: Article Name
+        article_code:
+          type: string
+          title: Article Code
+        is_main_asset:
+          type: boolean
+          title: Is Main Asset
+        analytic:
+          type: string
+          title: Analytic
+        analytic2:
+          type: string
+          title: Analytic2
+        analytic3:
+          type: string
+          title: Analytic3
+        article_document_number:
+          anyOf:
+          - type: string
+          - type: integer
+          title: Article Document Number
+        article_document_date:
+          type: string
+          format: date-time
+          title: Article Document Date
+        article_parent:
+          type: string
+          title: Article Parent
+        article_group:
+          type: string
+          title: Article Group
+        article_kind:
+          type: string
+          title: Article Kind
+        row_number:
+          type: integer
+          title: Row Number
+        article_row_number:
+          type: integer
+          title: Article Row Number
+        store:
+          type: string
+          title: Store
+        department:
+          type: string
+          title: Department
+        company_account_number:
+          type: string
+          title: Company Account Number
+        contractor_account_number:
+          type: string
+          title: Contractor Account Number
+        qty:
+          type: number
+          title: Qty
+        price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Price
+        sum:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Sum
+        cash_flow_item_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cash Flow Item Code
+        cash_flow_details_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cash Flow Details Code
+        year:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Year
+      type: object
+      required:
+      - number
+      - date
+      - is_reverse
+      - moving_type
+      - kind
+      - company_inn
+      - company_kpp
+      - base_document_number
+      - base_document_date
+      - base_document_kind
+      - base_document_operation_type
+      - contractor_name
+      - contractor_inn
+      - contractor_kpp
+      - contractor_kind
+      - article_name
+      - article_code
+      - is_main_asset
+      - analytic
+      - analytic2
+      - analytic3
+      - article_document_number
+      - article_document_date
+      - article_parent
+      - article_group
+      - article_kind
+      - row_number
+      - article_row_number
+      - store
+      - department
+      - company_account_number
+      - contractor_account_number
+      - qty
+      - price
+      - sum
+      - cash_flow_item_code
+      - cash_flow_details_code
+      - year
+      title: DataRow
+      description: Loading, input or output data row
+    ExtDataRow:
+      properties:
+        number:
+          type: string
+          title: Number
+        date:
+          type: string
+          format: date-time
+          title: Date
+        is_reverse:
+          type: boolean
+          title: Is Reverse
+        moving_type:
+          type: string
+          title: Moving Type
+        kind:
+          type: string
+          title: Kind
+        company_inn:
+          type: string
+          title: Company Inn
+        company_kpp:
+          type: string
+          title: Company Kpp
+        base_document_number:
+          anyOf:
+          - type: string
+          - type: integer
+          title: Base Document Number
+        base_document_date:
+          type: string
+          format: date-time
+          title: Base Document Date
+        base_document_kind:
+          type: string
+          title: Base Document Kind
+        base_document_operation_type:
+          type: string
+          title: Base Document Operation Type
+        contractor_name:
+          type: string
+          title: Contractor Name
+        contractor_inn:
+          type: string
+          title: Contractor Inn
+        contractor_kpp:
+          type: string
+          title: Contractor Kpp
+        contractor_kind:
+          type: string
+          title: Contractor Kind
+        article_name:
+          type: string
+          title: Article Name
+        article_code:
+          type: string
+          title: Article Code
+        is_main_asset:
+          type: boolean
+          title: Is Main Asset
+        analytic:
+          type: string
+          title: Analytic
+        analytic2:
+          type: string
+          title: Analytic2
+        analytic3:
+          type: string
+          title: Analytic3
+        article_document_number:
+          anyOf:
+          - type: string
+          - type: integer
+          title: Article Document Number
+        article_document_date:
+          type: string
+          format: date-time
+          title: Article Document Date
+        article_parent:
+          type: string
+          title: Article Parent
+        article_group:
+          type: string
+          title: Article Group
+        article_kind:
+          type: string
+          title: Article Kind
+        row_number:
+          type: integer
+          title: Row Number
+        article_row_number:
+          type: integer
+          title: Article Row Number
+        store:
+          type: string
+          title: Store
+        department:
+          type: string
+          title: Department
+        company_account_number:
+          type: string
+          title: Company Account Number
+        contractor_account_number:
+          type: string
+          title: Contractor Account Number
+        qty:
+          type: number
+          title: Qty
+        price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Price
+        sum:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Sum
+        cash_flow_item_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cash Flow Item Code
+        cash_flow_details_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cash Flow Details Code
+        year:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Year
+        cash_flow_details_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cash Flow Details Name
+        cash_flow_item_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cash Flow Item Name
+        payment_purpose:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Payment Purpose
+        payment_purpose_returned:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Payment Purpose Returned
+        contract_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Contract Name
+        contract_number:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Contract Number
+        accepted_issued:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Accepted Issued
+      type: object
+      required:
+      - number
+      - date
+      - is_reverse
+      - moving_type
+      - kind
+      - company_inn
+      - company_kpp
+      - base_document_number
+      - base_document_date
+      - base_document_kind
+      - base_document_operation_type
+      - contractor_name
+      - contractor_inn
+      - contractor_kpp
+      - contractor_kind
+      - article_name
+      - article_code
+      - is_main_asset
+      - analytic
+      - analytic2
+      - analytic3
+      - article_document_number
+      - article_document_date
+      - article_parent
+      - article_group
+      - article_kind
+      - row_number
+      - article_row_number
+      - store
+      - department
+      - company_account_number
+      - contractor_account_number
+      - qty
+      - price
+      - sum
+      - cash_flow_item_code
+      - cash_flow_details_code
+      - year
+      title: ExtDataRow
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ModelInfo:
+      properties:
+        status:
+          $ref: '#/components/schemas/ModelStatuses'
+        error_text:
+          type: string
+          title: Error Text
+        fitting_start_date:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Fitting Start Date
+        fitting_end_date:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Fitting End Date
+        metrics:
+          anyOf:
+          - additionalProperties:
+              type: number
+            type: object
+          - type: 'null'
+          title: Metrics
+      type: object
+      required:
+      - status
+      - error_text
+      - fitting_start_date
+      - fitting_end_date
+      - metrics
+      title: ModelInfo
+    ModelStatuses:
+      type: string
+      enum:
+      - CREATED
+      - FITTING
+      - READY
+      - ERROR
+      title: ModelStatuses
+    ModelTypes:
+      type: string
+      enum:
+      - rf
+      - catboost
+      - fasttext
+      - extfasttext
+      - catboost+
+      title: ModelTypes
+    StatusResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        start_time:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Start Time
+        end_time:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: End Time
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      type: object
+      required:
+      - status
+      title: StatusResponse
+    TaskResponse:
+      properties:
+        task_id:
+          type: string
+          title: Task Id
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - task_id
+      - message
+      title: TaskResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError

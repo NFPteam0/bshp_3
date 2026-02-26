@@ -6,6 +6,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from settings import USE_DETAILED_LOG
 
+
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
 
@@ -190,7 +191,7 @@ def check_fields(
             )
             mask = mask | col_mask
 
-    if mask.any():
+    if mask.any() and USE_DETAILED_LOG:
         logger.warning(f"Contains empty fields ({mask.sum()}):")
         logger.warning(
             "\n"

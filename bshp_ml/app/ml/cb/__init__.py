@@ -3,4 +3,4 @@ CatBoost model implementaion
 """
 
 from .classifier import *
-from .embed import *
+from .classifier_txt import *

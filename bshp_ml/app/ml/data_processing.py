@@ -21,8 +21,9 @@ import gc
 # from tasks import task_manager
 from settings import TEMP_FOLDER, USE_DETAILED_LOG, DB_URL
 from schemas.models import DataRow
-# from db import db_processor
 
+# from db import db_processor
+from ml.utils import periodic_dates
 
 logging.getLogger("vbm_data_processing_logger").setLevel(logging.ERROR)
 
@@ -151,6 +152,7 @@ class FeatureAdder(BaseEstimator, TransformerMixin):
 
         X["document_year"] = X["date"].apply(self._get_year)
         X["document_month"] = X["date"].apply(self._get_month)
+        X["sin_month"], X["cos_month"] = periodic_dates(X["document_month"])
 
         # X = X[self.additional_columns + self.x_columns + self.y_columns].copy()
         if USE_DETAILED_LOG:

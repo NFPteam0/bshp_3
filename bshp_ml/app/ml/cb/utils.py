@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, f1_score
 def eval_model(true_labels, predictions) -> tuple:
     ac = accuracy_score(true_labels, predictions)
     f1 = f1_score(true_labels, predictions, average="macro")
-    print(f"Accuracy: {ac:.4f}, F1: {f1:.4f}")
+    # print(f"Accuracy: {ac:.4f}, F1: {f1:.4f}")
     return ac, f1
 
 
@@ -18,10 +18,8 @@ def make_all_data(df: pd.DataFrame, y: str):
     общий срез датасета, где каждый объект искомого
     класса - уникальный
     """
-    # .reset_index()??
+
     all_data = df.drop_duplicates(subset=[y], keep="first").copy()
-    # all_data.reset_index(inplace=True, drop=True)
-    # all_data[f"{y}_norm"] = all_data.index
     return all_data
 
 

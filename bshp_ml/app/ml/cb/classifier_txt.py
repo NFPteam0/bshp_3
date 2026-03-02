@@ -190,15 +190,15 @@ class CatBoostModelEmbeddings(CatBoostModel):
             del model_new
             gc.collect()
 
-        model_new = CatBoostClassifier(**params)
-        test_base = model.predict(test_pool, prediction_type="RawFormulaVal")
-        test_base[np.isneginf(test_base)] = -1
-        test_pool.set_baseline(test_base)
+        # model_new = CatBoostClassifier(**params)
+        # test_base = model.predict(test_pool, prediction_type="RawFormulaVal")
+        # test_base[np.isneginf(test_base)] = -1
+        # test_pool.set_baseline(test_base)
 
-        model_new.fit(X=test_pool, eval_set=test_pool)
-        model = sum_models(
-            [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
-        )
+        # model_new.fit(X=test_pool, eval_set=test_pool)
+        # model = sum_models(
+        #     [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
+        # )
         return model
 
     def gridsearch(
@@ -256,7 +256,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         "early_stopping_rounds": int(iterations * 0.8) + 1,
                         "use_best_model": True,
                         "random_seed": SEED,
-                        "verbose": 0,
+                        "verbose": USE_DETAILED_LOG * 100,
                         "loss_function": "MultiClass",
                     }
 
@@ -274,7 +274,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                     # Оцениваем accuracy на тестовой выборке
                     preds = current_model.predict(test_pool, prediction_type="Class")
+
                     acc, f1 = eval_model(df_test[f"{y}"], preds)
+                    tacc, _ = eval_model(
+                        df_train[f"{y}"],
+                        current_model.predict(df_train, prediction_type="Class"),
+                    )
                     if USE_DETAILED_LOG:
                         logger.info(f"Accuracy: {acc:.4f}")
 
@@ -285,7 +290,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         best_params = params
                         if USE_DETAILED_LOG:
                             logger.info(
-                                f"*** New best model! Accuracy: {acc:.4f} *** Best params: {best_params}"
+                                f"*** New best model! Test Accuracy: {acc:.4f} ***, ***train accuracy: {tacc:.4f}*** Best params: {best_params}"
                             )
         return best_model
 
@@ -380,7 +385,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                     this_label = all_data[f"{y}_norm"].iloc[0]
                     bscores.extend([1 for _ in range(len(df_i[f"{y}_norm"]))])
-                    print("Only one details code, no need for model")
+                    logger.info("Only one details code, no need for model")
                     # TODO: сохранить словарь
                     self.strict_acc[y][int(item)] = this_label
                     continue
@@ -390,7 +395,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 all_data = make_all_data(df_i, f"{y}_norm")
                 all_classes = all_data[f"{y}_norm"].unique()
 
-                df_test = df_i.sample(frac=0.1, random_state=SEED)
+                df_test = df_i.sample(frac=0.15, random_state=SEED)
                 df_train = df_i.drop(df_test.index)
 
                 if len(df_test) == 0:
@@ -501,7 +506,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             all_data = make_all_data(df, f"{y}_norm")
             all_classes = all_data[f"{y}_norm"].unique()
 
-            df_test = df.sample(frac=0.1, random_state=SEED)
+            df_test = df.sample(frac=0.15, random_state=SEED)
             df_train = df.drop(df_test.index)
 
             cat_idxs = [

@@ -190,15 +190,15 @@ class CatBoostModelEmbeddings(CatBoostModel):
             del model_new
             gc.collect()
 
-        # model_new = CatBoostClassifier(**params)
-        # test_base = model.predict(test_pool, prediction_type="RawFormulaVal")
-        # test_base[np.isneginf(test_base)] = -1
-        # test_pool.set_baseline(test_base)
+        model_new = CatBoostClassifier(**params)
+        test_base = model.predict(test_pool, prediction_type="RawFormulaVal")
+        test_base[np.isneginf(test_base)] = -1
+        test_pool.set_baseline(test_base)
 
-        # model_new.fit(X=test_pool, eval_set=test_pool)
-        # model = sum_models(
-        #     [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
-        # )
+        model_new.fit(X=test_pool, eval_set=test_pool)
+        model = sum_models(
+            [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
+        )
         return model
 
     def gridsearch(

@@ -201,6 +201,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         # model = sum_models(
         #     [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
         # )
+        model.fit(X=test_pool)
         return model
 
     def gridsearch(
@@ -268,7 +269,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         y=y,
                         to_drop=to_drop,
                         cat_idxs=cat_idxs,
-                        df_train=pd.concat([df_train, df_test], ignore_index=True),
+                        df_train=df_train,
                         df_test=df_test,
                         test_pool=test_pool,
                         all_data=all_data,
@@ -308,9 +309,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
         df = df.copy()
         # TODO: fsttxt class feature
         # TODO: article_parent rm numbers
-        # df["article_parent"].str.replace(
-        #     r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True
-        # ).str.strip()
+        df["article_parent"] = (
+            df["article_parent"]
+            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+            .str.strip()
+        )
 
         UNFEATURED = [
             "company_inn",
@@ -658,11 +661,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
         for y in self.y_columns:
             X[y] = ""
         # set_config(transform_output="pandas")
-        # X["article_parent"] = (
-        #     X["article_parent"]
-        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
-        #     .str.strip()
-        # )
+        X["article_parent"] = (
+            X["article_parent"]
+            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+            .str.strip()
+        )
         X_y = pipeline.fit_transform(X).copy()
         # c_x_columns = self.x_columns + [
         #     "number",

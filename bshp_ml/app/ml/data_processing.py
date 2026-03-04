@@ -152,7 +152,9 @@ class FeatureAdder(BaseEstimator, TransformerMixin):
 
         X["document_year"] = X["date"].apply(self._get_year)
         X["document_month"] = X["date"].apply(self._get_month)
+        X["document_day"] = X["date"].apply(self._get_day)
         X["sin_month"], X["cos_month"] = periodic_dates(X["document_month"])
+        X["sin_day"], X["cos_day"] = periodic_dates(X["document_day"], dt="day")
 
         # X = X[self.additional_columns + self.x_columns + self.y_columns].copy()
         if USE_DETAILED_LOG:
@@ -164,6 +166,9 @@ class FeatureAdder(BaseEstimator, TransformerMixin):
 
     def _get_year(self, date_value: datetime):
         return date_value.year
+
+    def _get_day(self, date_value: datetime):
+        return date_value.day
 
 
 class NanProcessor(BaseEstimator, TransformerMixin):

@@ -112,9 +112,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 "accepted_issued",
                 "sin_month",
                 "cos_month",
+                "sin_day",
+                "cos_day",
             ]
         )
-        self.float_columns.extend(["sin_month", "cos_month"])
+        self.float_columns.extend(["sin_month", "cos_month", "sin_day", "cos_day"])
         self.columns_to_encode = self.categorical
 
         self.date_columns = [
@@ -190,15 +192,15 @@ class CatBoostModelEmbeddings(CatBoostModel):
             del model_new
             gc.collect()
 
-        model_new = CatBoostClassifier(**params)
-        test_base = model.predict(test_pool, prediction_type="RawFormulaVal")
-        test_base[np.isneginf(test_base)] = -1
-        test_pool.set_baseline(test_base)
+        # model_new = CatBoostClassifier(**params)
+        # test_base = model.predict(test_pool, prediction_type="RawFormulaVal")
+        # test_base[np.isneginf(test_base)] = -1
+        # test_pool.set_baseline(test_base)
 
-        model_new.fit(X=test_pool, eval_set=test_pool)
-        model = sum_models(
-            [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
-        )
+        # model_new.fit(X=test_pool, eval_set=test_pool)
+        # model = sum_models(
+        #     [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
+        # )
         return model
 
     def gridsearch(
@@ -227,7 +229,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
-                100,
+                2**7,
                 # 200,
                 #   400,
             ],
@@ -266,7 +268,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         y=y,
                         to_drop=to_drop,
                         cat_idxs=cat_idxs,
-                        df_train=df_train,
+                        df_train=pd.concat([df_train, df_test], ignore_index=True),
                         df_test=df_test,
                         test_pool=test_pool,
                         all_data=all_data,

@@ -326,7 +326,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                             current_model_test = CatBoostClassifier(**_params)
                             current_model_test = current_model_test.fit(
                                 X=final_batch.drop(y, axis=1),
-                                y=df_test[y],
+                                y=final_batch[y],
                                 init_model=current_model,
                                 cat_features=cat_idxs,
                             )

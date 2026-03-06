@@ -189,8 +189,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 model = sum_models(
                     [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
                 )  # TODO: weights = [1/2] * 2?
-            del model_new
-            gc.collect()
+                del model_new
+                gc.collect()
 
         # model_new = CatBoostClassifier(**params)
         # test_base = model.predict(test_pool, prediction_type="RawFormulaVal")
@@ -201,7 +201,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
         # model = sum_models(
         #     [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
         # )
-        model.fit(X=test_pool)
         return model
 
     def gridsearch(
@@ -283,18 +282,50 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         df_train[f"{y}"],
                         current_model.predict(df_train, prediction_type="Class"),
                     )
-                    if USE_DETAILED_LOG:
-                        logger.info(f"Accuracy: {acc:.4f}")
 
+                    acc_after_test, _ = eval_model(df_test[f"{y}"], preds)
+                    if USE_DETAILED_LOG:
+                        logger.info(f"Accuracy: {acc_after_test:.4f}")
                     # Сохраняем лучшую модель
                     if acc > best_score:
                         best_score = acc
-                        best_model = current_model
+
                         best_params = params
                         if USE_DETAILED_LOG:
                             logger.info(
                                 f"*** New best model! Test Accuracy: {acc:.4f} ***, ***train accuracy: {tacc:.4f}*** Best params: {best_params}"
                             )
+
+                        if USE_DETAILED_LOG:
+                            logger.info(f"Accuracy: {acc:.4f}")
+                            logger.info("Learn on test data...")
+
+                        if USE_DETAILED_LOG:
+                            logger.info(
+                                f"Model loss_function: {current_model.get_params().get('loss_function')}"
+                            )
+                            logger.info(
+                                f"Model classes_count: {current_model.get_params().get('classes_count')}"
+                            )
+                            logger.info(
+                                f"Baseline shape: {test_pool.get_baseline().shape if test_pool.get_baseline() is not None else None}"
+                            )
+                            # TODO: mix with the latest
+                            # df_latest = df[df['year'] > ][:2000]
+                            # final_batch = pd.concat([df_test, df_latest])
+                            # Дообучить для прода
+
+                            _params = params.copy()
+                            _params["use_best_model"] = False
+
+                            current_model_test = CatBoostClassifier(**_params)
+                            current_model_test = current_model_test.fit(
+                                X=df_test.drop(y, axis=1),
+                                y=df_test[y],
+                                init_model=current_model,
+                                cat_features=cat_idxs,
+                            )
+                            best_model = current_model_test
         return best_model
 
     def train_on_field(

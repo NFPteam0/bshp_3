@@ -453,6 +453,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 all_classes = all_data[f"{y}_norm"].unique()
 
                 df_test = df_i.sample(frac=0.15, random_state=SEED)
+
+                _df_latest_i = encoder.transform(_df_latest)
+                _df_latest_i.drop(to_drop, inplace=True, axis=1)
+                _df_latest_i = _df_latest_i.query(
+                    f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1"
+                )
+
                 df_train = df_i.drop(df_test.index)
 
                 if len(df_test) == 0:
@@ -496,7 +503,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     lr=parameters.get("lr", 0.01),
                     trees=parameters.get("trees", 30),
                     all_data=all_data,
-                    _df_latest=_df_latest,
+                    _df_latest=_df_latest_i,
                 )
                 self.field_models[y][int(item)] = model_i
 
@@ -565,6 +572,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
             all_classes = all_data[f"{y}_norm"].unique()
 
             df_test = df.sample(frac=0.15, random_state=SEED)
+
+            _df_latest = encoder.transform(_df_latest)
+            _df_latest.drop(to_drop, inplace=True, axis=1)
+            _df_latest = _df_latest.query(
+                f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1"
+            )
+
             df_train = df.drop(df_test.index)
 
             cat_idxs = [

@@ -390,6 +390,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             ],
             axis=1,
         )
+        _df_latest = _df_latest[df.columns]
         # drop here? No ' '(-1) for models?
 
         if y == "cash_flow_details_code":

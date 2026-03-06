@@ -382,6 +382,14 @@ class CatBoostModelEmbeddings(CatBoostModel):
             ],
             axis=1,
         )
+        _df_latest = _df_latest.drop(
+            labels=[
+                col
+                for col in UNFEATURED
+                if col not in self.categorical and col in df.columns
+            ],
+            axis=1,
+        )
         # drop here? No ' '(-1) for models?
 
         if y == "cash_flow_details_code":

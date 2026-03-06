@@ -215,6 +215,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         all_data: pd.DataFrame,
         lr=0.01,
         trees=20,
+        _df_latest: None | pd.DataFrame = None,
     ):
         """
         Traines few models and choses best based on a given catboost parametrs
@@ -310,17 +311,21 @@ class CatBoostModelEmbeddings(CatBoostModel):
                             logger.info(
                                 f"Baseline shape: {test_pool.get_baseline().shape if test_pool.get_baseline() is not None else None}"
                             )
-                            # TODO: mix with the latest
-                            # df_latest = df[df['year'] > ][:2000]
-                            # final_batch = pd.concat([df_test, df_latest])
-                            # Дообучить для прода
 
+                            if _df_latest is not None and len(_df_latest) > 0:
+                                final_batch = pd.concat(
+                                    [df_test, _df_latest], ignore_index=True
+                                )
+                            else:
+                                final_batch = df_test
+
+                            # Дообучить для прода
                             _params = params.copy()
                             _params["use_best_model"] = False
 
                             current_model_test = CatBoostClassifier(**_params)
                             current_model_test = current_model_test.fit(
-                                X=df_test.drop(y, axis=1),
+                                X=final_batch.drop(y, axis=1),
                                 y=df_test[y],
                                 init_model=current_model,
                                 cat_features=cat_idxs,
@@ -362,6 +367,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
         if y != "year":
             UNFEATURED += ["pred_pp_year", "prob_pp_year", "pred_year", "prob_year"]
 
+        _df_latest = (
+            df.sort_values(
+                by=["document_year", "document_month"], ascending=[True, True]
+            )
+            .tail(10_000)
+            .copy()
+        )
         df = df.drop(
             labels=[
                 col
@@ -475,6 +487,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     lr=parameters.get("lr", 0.01),
                     trees=parameters.get("trees", 30),
                     all_data=all_data,
+                    _df_latest=_df_latest,
                 )
                 self.field_models[y][int(item)] = model_i
 
@@ -578,6 +591,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 lr=parameters.get("lr", 0.01),
                 trees=parameters.get("trees", 30),
                 all_data=all_data,
+                _df_latest=_df_latest,
             )
             self.field_models[y] = model_i
             self._save_cb_model(model_i, y)

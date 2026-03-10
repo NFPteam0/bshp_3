@@ -227,12 +227,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
             ],
             "depth": [6],
             "iterations": [
-                # trees,
+                trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
-                # 2**7,
-                400,
-                #   400,
+                2**8,
+                # 400,
             ],
             "l2_leaf_reg": [4],
         }

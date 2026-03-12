@@ -336,7 +336,7 @@ class FastTextModel(Model):
         vectors = []
         names = []
         for cls in classes:
-            tokens = tuple((cls.lower() + str(codes[cls])).split())
+            tokens = tuple((cls.lower()).split())
             vec = self.sentence_vector_cached(tokens, self.base_name, self.model_type)
             vectors.append(vec)
             names.append(cls)
@@ -391,7 +391,6 @@ class FastTextModel(Model):
         return pred_labels, pred_probs
 
     def _save_column_model(self, column, item=None):
-        # TODO:
         pass
 
     def _load_column_model(self, column, item=None):

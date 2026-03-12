@@ -100,7 +100,9 @@ async def fit(
         logger.error(
             f"Collection not found. Please, insure base {base_name} is loaded: {e}"
         )
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(
+            status_code=404, detail=f"No data. Save the data from 1C. Detail: {str(e)}"
+        )
     try:
         fsttext = model_manager.get_model(ModelTypes.extfstxt, "all_bases")
         # модель фасттекст для всех баз одна

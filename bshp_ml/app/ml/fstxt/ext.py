@@ -57,16 +57,12 @@ class ExtFastTextModel(FastTextModel):
         else:
             set_from = X
         if set_classes:
-            set_from["cash_flow_item_name"] = (
-                set_from["cash_flow_item_code"]
-                .astype(str)
-                .str.cat(set_from["cash_flow_details_code"].astype(str))
-            )
-            set_from["cash_flow_details_name"] = (
-                set_from["cash_flow_details_name"]
-                .astype(str)
-                .str.cat(set_from["cash_flow_details_code"].astype(str))
-            )
+            set_from["cash_flow_item_name"] = set_from["cash_flow_item_name"].astype(
+                str
+            ) + set_from["cash_flow_item_code"].astype(int).astype(str)
+            set_from["cash_flow_details_name"] = set_from[
+                "cash_flow_details_name"
+            ].astype(str) + set_from["cash_flow_details_code"].astype(int).astype(str)
             self.all_classes_names = {
                 col: set_from[col].unique() for col in self.y_columns
             }

@@ -1,0 +1,196 @@
+[
+{
+
+"number": "000024087",
+
+"date": "01.07.2025 0:04:01",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "00БП-000210",
+
+"base_document_date": "14.07.2025 0:00:00",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ФизическоеЛицо",
+
+"contractor_name": "Население",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "Основной договор (покупатели)",
+
+"contract_number": "",
+
+"article_document_number": "00БП-000258",
+
+"article_document_date": "11.07.2025 23:59:59",
+
+"article_document_found": "true",
+
+"unit_code": "166",
+
+"article_name": "Зерноотходы (озимая пшеница) 2025",
+
+"article_code": "БП-00027718",
+
+"is_main_asset": "false",
+
+"analytic": "Зерноотходы 2025",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "2025",
+
+"article_group": "Озимая пшеница 2025",
+
+"article_kind": "Продукция растениеводства",
+
+"store": "Зерносклад (Балахоновский)",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 1,
+
+"qty": 9.35,
+
+"price": 2500,
+
+"sum": 23375,
+
+"article_row_number": null,
+
+"cash_flow_item_code": "000000081",
+
+"year": "2025",
+
+"cash_flow_details_code": "000000245",
+
+"cash_flow_item_name": "прочее",
+
+"cash_flow_details_name": "Зерноотходы",
+
+"payment_purpose": "Зерноотходы (озимая пшеница) 2025 - 9350 кг, Зерноотходы (озимый ячмень) 2025 - 650 кг",
+
+"payment_purpose_returned": "",
+
+"accepted_issued": "Кальницкая Е. В. "
+
+},
+
+{
+
+"number": "000024087",
+
+"date": "01.07.2025 0:04:01",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "00БП-000210",
+
+"base_document_date": "14.07.2025 0:00:00",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ФизическоеЛицо",
+
+"contractor_name": "Население",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "Основной договор (покупатели)",
+
+"contract_number": "",
+
+"article_document_number": "00БП-000258",
+
+"article_document_date": "11.07.2025 23:59:59",
+
+"article_document_found": "true",
+
+"unit_code": "166",
+
+"article_name": "Зерноотходы (озимая пшеница) 2025",
+
+"article_code": "БП-00027718",
+
+"is_main_asset": "false",
+
+"analytic": "Зерноотходы 2025",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "2025",
+
+"article_group": "Озимая пшеница 2025",
+
+"article_kind": "Продукция растениеводства",
+
+"store": "Зерносклад (Балахоновский)",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 2,
+
+"qty": 0.65,
+
+"price": 2500,
+
+"sum": 1625,
+
+"article_row_number": null,
+
+"cash_flow_item_code": "000000081",
+
+"year": "2025",
+
+"cash_flow_details_code": "000000245",
+
+"cash_flow_item_name": "прочее",
+
+"cash_flow_details_name": "Зерноотходы",
+
+"payment_purpose": "Зерноотходы (озимая пшеница) 2025 - 9350 кг, Зерноотходы (озимый ячмень) 2025 - 650 кг",
+
+"payment_purpose_returned": "",
+
+"accepted_issued": "Кальницкая Е. В. "
+
+}]

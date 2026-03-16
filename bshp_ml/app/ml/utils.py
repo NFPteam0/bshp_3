@@ -2,9 +2,20 @@ import pandas as pd
 import numpy as np
 
 
-def pereodic_dates(date_col: pd.Series):
-    _sin = np.sin((date_col.dt.month * 2 * np.pi) / 12)
-    _cos = np.cos((date_col.dt.month * 2 * np.pi) / 12)
+def periodic_dates(
+    date_col: pd.Series, dt: str = "month"
+) -> tuple[pd.Series, pd.Series]:
+    """
+    date_col - номер месяца/дня/квартала
+    """
+    if dt == "month":
+        div = 12
+    elif dt == "day":
+        div = 31
+    else:
+        div = 4
+    _sin = np.sin((date_col * 2 * np.pi) / div)
+    _cos = np.cos((date_col * 2 * np.pi) / div)
     return (_sin, _cos)
 
 

@@ -1,0 +1,98 @@
+[
+{
+
+"number": "000022707",
+
+"date": "01.04.2025 12:01:19",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "00БП-000085",
+
+"base_document_date": "02.04.2025 8:20:21",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "2610015957",
+
+"company_kpp": "261001001",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ФизическоеЛицо",
+
+"contractor_name": "Работники",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "Основной договор (покупатели)",
+
+"contract_number": "",
+
+"article_document_number": "00БП-001188",
+
+"article_document_date": "14.12.2023 11:25:25",
+
+"article_document_found": "true",
+
+"unit_code": "166",
+
+"article_name": "Сахар 2023",
+
+"article_code": "БП-00021278",
+
+"is_main_asset": "false",
+
+"analytic": "Сахар 2023",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "Продукция промышленных производств",
+
+"article_group": "Сахар 2023",
+
+"article_kind": "Продукция промышленных производств",
+
+"store": "Пекарня",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 1,
+
+"qty": 2350,
+
+"price": 52,
+
+"sum": 650,
+
+"article_row_number": 1,
+
+"cash_flow_item_code": "000000033",
+
+"year": "",
+
+"cash_flow_details_code": "000000194",
+
+"cash_flow_item_name": "Прочее",
+
+"cash_flow_details_name": "Услуги автотранспорта",
+
+"payment_purpose": "Услуги автомобиля КАМАЗ - 0,5 ч",
+
+"payment_purpose_returned": "",
+
+"accepted_issued": "Полянская Е.А. "
+
+}]

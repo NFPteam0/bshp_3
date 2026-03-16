@@ -8,6 +8,7 @@
 *.env
 *.mdl
 
+.vscode
 /.venv/*
 /.vscode/*
 .env

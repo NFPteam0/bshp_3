@@ -119,7 +119,7 @@ async def lifespan(app: FastAPI):
         logger.info("Starting models initialize")
         init_model_manager()
 
-        await get_model_manager().read_models()  # TODO: check if got mine
+        await get_model_manager().read_models()
         logger.info("Models initializing done")
     except Exception as e:
         logger.error(f"Models initializing error: {e}")

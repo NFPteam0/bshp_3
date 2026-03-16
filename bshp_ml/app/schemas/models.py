@@ -116,6 +116,12 @@ class EmbedPredictionsRow(BaseModel):
     pred_prob: float
 
 
+class ExtEmbedPredictionsRow(EmbedPredictionsRow):
+    pred_label_pp: str
+    pred_prob_pp: float
+    pred_conf: str
+
+
 class ModelStatuses(Enum):
     CREATED = "CREATED"
     FITTING = "FITTING"
@@ -135,4 +141,5 @@ class ModelTypes(str, Enum):
     rf = "rf"
     catboost = "catboost"
     fstxt = "fasttext"
+    extfstxt = "extfasttext"
     catboost_txt = "catboost+"

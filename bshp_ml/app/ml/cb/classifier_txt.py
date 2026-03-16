@@ -311,25 +311,25 @@ class CatBoostModelEmbeddings(CatBoostModel):
                                 f"Baseline shape: {test_pool.get_baseline().shape if test_pool.get_baseline() is not None else None}"
                             )
 
-                            if _df_latest is not None and len(_df_latest) > 0:
-                                final_batch = pd.concat(
-                                    [df_test, _df_latest], ignore_index=True
-                                )
-                            else:
-                                final_batch = df_test
-
-                            # Дообучить для прода
-                            _params = params.copy()
-                            _params["use_best_model"] = False
-
-                            current_model_test = CatBoostClassifier(**_params)
-                            current_model_test = current_model_test.fit(
-                                X=final_batch.drop(y, axis=1),
-                                y=final_batch[y],
-                                init_model=current_model,
-                                cat_features=cat_idxs,
+                        if _df_latest is not None and len(_df_latest) > 0:
+                            final_batch = pd.concat(
+                                [df_test, _df_latest], ignore_index=True
                             )
-                            best_model = current_model_test
+                        else:
+                            final_batch = df_test
+
+                        # Дообучить для прода
+                        _params = params.copy()
+                        _params["use_best_model"] = False
+
+                        current_model_test = CatBoostClassifier(**_params)
+                        current_model_test = current_model_test.fit(
+                            X=final_batch.drop(y, axis=1),
+                            y=final_batch[y],
+                            init_model=current_model,
+                            cat_features=cat_idxs,
+                        )
+                        best_model = current_model_test
         return best_model
 
     def train_on_field(

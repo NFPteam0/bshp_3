@@ -88,6 +88,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         self.categorical.extend([f"pred_pp_{y}" for y in self.fsttxt_columns])
         self.float_columns.extend([f"prob_pp_{y}" for y in self.fsttxt_columns])
+        self.float_columns.extend([f"class_rate_{y}" for y in self.fsttxt_columns])
+
         self.str_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
             + [
@@ -105,6 +107,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         )
         self.x_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
+            + [f"class_rate_{y}" for y in self.fsttxt_columns]
             + [
                 "payment_purpose",
                 "contract_name",

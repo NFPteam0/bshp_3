@@ -28,7 +28,7 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         X[self.y] = X[self.y].astype(int)
 
         self.set_mapping(X)
-        # self.set_txt_class_rate(X)
+        self.set_txt_class_rate(X)
 
         if USE_DETAILED_LOG:
             logger.info("Len of classes: %s", len(X[self.y].unique()))
@@ -55,7 +55,8 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
 
         self.code2norm = dict(zip(self.df["code1c"].astype(int), self.df["code_norm"]))
         self.norm2code = dict(zip(self.df["code_norm"], self.df["code1c"].astype(int)))
-        self.code2name = dict(zip(self.df["code_norm"], self.df["name"]))
+        self.norm2name = dict(zip(self.df["code_norm"], self.df["name"]))
+        self.code2name = dict(zip(self.df["code1c"], self.df["name"]))
         self.name2code = dict(zip(self.df["name"], self.df["code_norm"]))
 
     def set_txt_class_rate(self, X: pd.DataFrame):
@@ -63,10 +64,19 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         name = self.name_col
 
         if f"pred_{name}" in X.columns and name in X.columns:
+            # rate для класса: как часто именно его угадывает
+            # текстовая модель (на обучающей выборке)
             self.code2rate = {
-                code: len(X[X[f"pred_{name}"] == X[f"{name}"] & X[name] == code])
-                / len(X[X[f"pred_{y}"] == code])
-                for code in self.all_classes_codes
+                code: len(
+                    X[
+                        (X[f"pred_{name}"] == X[f"{name}"])
+                        & (X[name] == self.code2name[code])
+                    ]
+                )
+                / len(X[X[f"{name}"] == self.code2name[code]])
+                if len(X[X[f"{name}"] == self.code2name[code]]) != 0
+                else 0
+                for code in self.code2norm.keys()
             }
         else:
             self.code2rate = None
@@ -79,7 +89,8 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             logger.info("Encoding, shape: %s", str(X.shape))
 
         X[f"{self.y}_norm"] = X[self.y].map(self.code2norm).fillna(-1).astype(int)
-        logger.info("Len of _norm classes: %s", len(X[f"{self.y}_norm"].unique()))
+        if USE_DETAILED_LOG:
+            logger.info("Len of _norm classes: %s", len(X[f"{self.y}_norm"].unique()))
         if self.name_col:
             if USE_DETAILED_LOG:
                 logger.info(
@@ -101,9 +112,8 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             X[f"pred_pp_{self.name_col}"] = X[f"pred_pp_{self.name_col}"].replace(
                 self.name2code
             )
-            # X[f"class_rate_{self.name_col}"] = X[f"pred_{self.name_col}"].map(
-            #     self.code2rate
-            # )
+            if self.code2rate is not None:
+                X[f"class_rate_{self.name_col}"] = X[self.y].map(self.code2rate)
 
             if USE_DETAILED_LOG:
                 logger.info(
@@ -125,7 +135,7 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         X = X.copy()
         if self.name_col != "year":
             # predicted name to corresponding label
-            X[f"{self.name_col}"] = X[f"{self.y}_norm"].map(self.code2name).fillna("")
+            X[f"{self.name_col}"] = X[f"{self.y}_norm"].map(self.norm2name).fillna("")
 
             # X[self.y] = X[X[self.y] == -1][f"pred_{self.name_col}"].map(self.name2code)
             # X[self.name_col] = X[f"pred_{self.name_col}"]

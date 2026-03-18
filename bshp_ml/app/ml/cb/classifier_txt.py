@@ -366,8 +366,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "row_number",
             "number",
         ]
+
         if y != "year":
             UNFEATURED += ["pred_pp_year", "prob_pp_year", "pred_year", "prob_year"]
+
+        categorical = [col for col in self.categorical if col not in UNFEATURED]
 
         _df_latest = (
             df.sort_values(
@@ -380,7 +383,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             labels=[
                 col
                 for col in UNFEATURED
-                if col not in self.categorical and col in df.columns
+                if col not in categorical and col in df.columns
             ],
             axis=1,
         )
@@ -388,7 +391,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             labels=[
                 col
                 for col in UNFEATURED
-                if col not in self.categorical and col in df.columns
+                if col not in categorical and col in df.columns
             ],
             axis=1,
         )
@@ -428,7 +431,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         for c in self.str_columns
                         + self.fsttxt_columns
                         + ["uploading_date"]
-                        if (c in df_i.columns and c not in self.categorical)
+                        if (c in df_i.columns and c not in categorical)
                     ]
                 )
 
@@ -476,7 +479,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # cats indxs
                 cat_idxs = [
                     df_i.columns.get_loc(key=cat)
-                    for cat in self.categorical
+                    for cat in categorical
                     if cat in df_i.columns
                 ]
 

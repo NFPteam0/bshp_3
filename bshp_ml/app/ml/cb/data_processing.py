@@ -113,7 +113,12 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                 self.name2code
             )
             if self.code2rate is not None:
-                X[f"class_rate_{self.name_col}"] = X[self.y].map(self.code2rate)
+                X[f"class_rate_{self.name_col}"] = (
+                    X[f"pred_{self.name_col}"]
+                    .map(self.norm2code)
+                    .map(self.code2rate)
+                    .fillna(-1)
+                )
 
             if USE_DETAILED_LOG:
                 logger.info(

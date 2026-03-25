@@ -5,7 +5,7 @@ LABEL authors="dark_h14"
 WORKDIR /app
 COPY ./requirements.txt .
 EXPOSE 8061
-RUN python3 -m pip install --root-user-action=ignore --upgrade pip && python3 -m  pip install --root-user-action=ignore -r requirements.txt
+RUN python3 -m pip install --root-user-action=ignore --upgrade pip && python3 -m  pip install --root-user-action=ignore  --trusted-host pypi.org -r requirements.txt
 
 ENV PYTHONPATH=/app
 

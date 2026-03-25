@@ -152,7 +152,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         test_pool: Pool,
         all_data: pd.DataFrame,
     ) -> CatBoostClassifier:
-        """Trains one catboost model.
+        """Trains one catboost model from scratch.
         <b>NOTE: before fitting add columns from fasttext model</b>"""
         model = None
         model_new = None

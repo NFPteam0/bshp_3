@@ -122,22 +122,26 @@ class ExtFastTextModel(FastTextModel):
             "article_kind",
         ]
 
+        ARTICLE_COLUMNS = [
+            "article_name",
+            "analytic",
+            "analytic2",
+            "analytic3",
+            "article_parent",
+            "article_group",
+            "article_kind",
+        ]
         PP_COLUMNS = ["payment_purpose", "payment_purpose_returned"]
 
         # 3. Preprocess sentences
         sentences = prepare_sentences(
             X,
-            [
-                col
-                for col in self.str_columns
-                if col not in UNFEATURED + ["payment_purpose"]
-                and col not in self.y_columns
-            ],
+            ARTICLE_COLUMNS,
         )
 
         sentences_pp = prepare_sentences(
             X,
-            [col for col in PP_COLUMNS],
+            PP_COLUMNS,
         )
 
         # 4. Predict

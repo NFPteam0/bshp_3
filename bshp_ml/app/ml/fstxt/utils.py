@@ -27,26 +27,26 @@ def prepare_sentences(df: pd.DataFrame, txt_cols) -> list[list[str]]:
     """
     df_txt = df[txt_cols].astype(str)
 
-    HIGH_IMP = [
-        "article_name",
-        "payment_purpose",
-        "payment_purpose_returned",
-        "analytic",
-        "analytic2",
-        "analytic3",
-    ]
-    for col in HIGH_IMP:
-        if col in df_txt.columns:
-            if col == "payment_purpose" or col == "payment_purpose_returned":
-                df_txt[col] = df_txt[col].str.replace(RE_NUMBERS, " ", regex=True)
-            df_txt[col] = df_txt[col] + " "
+    # HIGH_IMP = [
+    #     "article_name",
+    #     "payment_purpose",
+    #     "payment_purpose_returned",
+    #     "analytic",
+    #     "analytic2",
+    #     "analytic3",
+    # ]
+    # for col in HIGH_IMP:
+    #     if col in df_txt.columns:
+    #         # if col == "payment_purpose" or col == "payment_purpose_returned":
+    #             # df_txt[col] = df_txt[col].str.replace(RE_NUMBERS, " ", regex=True)
+    #         df_txt[col] = df_txt[col] + " "
 
     # df_txt = df_txt[HIGH_IMP].agg(" ".join, axis=1)
     df_txt = df_txt.agg(" ".join, axis=1)
 
     cleaned = preprocess_text(df_txt)
 
-    sentences = cleaned[cleaned != ""].str.split().to_list()
+    sentences = cleaned.str.split().to_list()
 
     return sentences
 

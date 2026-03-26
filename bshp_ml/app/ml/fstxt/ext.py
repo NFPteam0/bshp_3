@@ -165,6 +165,12 @@ class ExtFastTextModel(FastTextModel):
             X[f"pred_pp_{y}"] = preds_pp
             X[f"prob_pp_{y}"] = probs_pp
 
+            # голосование с плеч кэтбуста
+            __pp_mask = X[f"prob_pp_{y}"] > X[f"prob_{y}"]
+
+            X.loc[__pp_mask, f"pred_{y}"] = X.loc[__pp_mask, f"pred_pp_{y}"]
+            X.loc[__pp_mask, f"prob_{y}"] = X.loc[__pp_mask, f"prob_pp_{y}"]
+
             gc.collect()
 
         return X.to_json(

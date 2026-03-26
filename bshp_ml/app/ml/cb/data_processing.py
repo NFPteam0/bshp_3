@@ -109,9 +109,9 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             X[f"pred_{self.name_col}"] = X[f"pred_{self.name_col}"].replace(
                 self.name2code
             )
-            X[f"pred_pp_{self.name_col}"] = X[f"pred_pp_{self.name_col}"].replace(
-                self.name2code
-            )
+            # X[f"pred_pp_{self.name_col}"] = X[f"pred_pp_{self.name_col}"].replace(
+            #     self.name2code
+            # )
             if self.code2rate is not None:
                 X[f"class_rate_{self.name_col}"] = (
                     X[f"pred_{self.name_col}"]
@@ -192,15 +192,14 @@ def check_fields(
     df: pd.DataFrame,
     columns_to_check: list[str],
 ):
-    # Создаем пустую маску
     mask = pd.Series(False, index=df.index)
 
     for col in columns_to_check:
         if col in df.columns:
             col_mask = (
                 df[col].isna()  # NaN
-                | (df[col].astype(str).str.strip() == "")  # пустые строки/пробелы
-                | df[col].isin([0, -1, "0", "-1"])  # невалидные значения
+                | (df[col].astype(str).str.strip() == "")
+                | df[col].isin([0, -1, "0", "-1"])
             )
             mask = mask | col_mask
 
@@ -208,11 +207,8 @@ def check_fields(
         logger.warning(f"Contains empty fields ({mask.sum()}):")
         logger.warning(
             "\n"
-            + df.to_string(
-                index=True,  # Показать индексы
-                max_rows=None,  # Все строки
-                max_cols=None,  # Все колонки
-                line_width=1000,  # Широкая строка
-                show_dimensions=True,  # Показать размеры
+            + df.to_json(
+                orient="records",
+                force_ascii=False,
             )
         )

@@ -86,8 +86,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])
         self.categorical.extend([f"pred_{y}" for y in self.fsttxt_columns])
 
-        self.categorical.extend([f"pred_pp_{y}" for y in self.fsttxt_columns])
-        self.float_columns.extend([f"prob_pp_{y}" for y in self.fsttxt_columns])
+        # self.categorical.extend([f"pred_pp_{y}" for y in self.fsttxt_columns])
+        # self.float_columns.extend([f"prob_pp_{y}" for y in self.fsttxt_columns])
         self.float_columns.extend([f"class_rate_{y}" for y in self.fsttxt_columns])
 
         self.str_columns.extend(
@@ -230,7 +230,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             ],
             "depth": [6],
             "iterations": [
-                trees,
+                # trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
                 2**7,
@@ -365,7 +365,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "article_row_number",
             "row_number",
             "number",
-        ]
+        ] + [f"pred_pp_{y}" for y in self.fsttxt_columns]
 
         if y != "year":
             UNFEATURED += ["pred_pp_year", "prob_pp_year", "pred_year", "prob_year"]
@@ -763,8 +763,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 logger.info('Start predicting. Field = "{}"'.format(y))
             if y == "cash_flow_details_code":
                 cash_flow_items = list(X_y["cash_flow_item_code"].unique().astype(int))
-                # X_y["row_number"] = row_numbers
-                # X_y_list = []
 
                 for ind, item_col in enumerate(cash_flow_items):
                     if USE_DETAILED_LOG:
@@ -809,7 +807,25 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         )
 
                         y_pred = model.predict(X_pool, prediction_type="Class")
+
                         Xy1[f"{y}_norm"] = y_pred.ravel()
+
+                        if USE_DETAILED_LOG:
+                            logging.info(f"Feature names: {model.feature_names_}")
+                            importance = (
+                                pd.DataFrame(
+                                    {
+                                        "imp": model.get_feature_importance(),
+                                        "names": model.feature_names_,
+                                    }
+                                )
+                                .sort_values("imp", ascending=False)
+                                .head()
+                            )
+                            logging.info(
+                                f"For {y} most important fields are:\n%s",
+                                importance.to_json,
+                            )
                     Xy1 = encoder.inverse_transform(Xy1)
                     # X_y[X_y["cash_flow_item_code"] == item_col][y] = Xy1[y]
 
@@ -877,6 +893,17 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     X_y = encoder.inverse_transform(X_y)
                     # if y == "year":
                     #     X_y.loc[year_mask, y] = ""
+
+                    if USE_DETAILED_LOG:
+                        _js = X_y.to_json(
+                            orient="records",
+                            force_ascii=False,
+                        )
+                        logger.info(
+                            'Predictions ITEM: \n"{}"'.format(
+                                _js.dumps(indent=4, force_ascii=False)
+                            )
+                        )
 
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))

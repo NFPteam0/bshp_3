@@ -903,7 +903,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         )
                         logger.info(
                             'Predictions ITEM: \n"{}"'.format(
-                                json.dumps(_js, indent=4, force_ascii=False)
+                                json.dumps(_js, indent=4, ensure_ascii=False)
                             )
                         )
 

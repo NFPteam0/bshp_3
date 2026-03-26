@@ -895,13 +895,15 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     #     X_y.loc[year_mask, y] = ""
 
                     if USE_DETAILED_LOG:
-                        _js = X_y.to_json(
-                            orient="records",
-                            force_ascii=False,
+                        _js = json.loads(
+                            X_y.to_json(
+                                orient="records",
+                                force_ascii=False,
+                            )
                         )
                         logger.info(
                             'Predictions ITEM: \n"{}"'.format(
-                                _js.dumps(indent=4, force_ascii=False)
+                                json.dumps(_js, indent=4, force_ascii=False)
                             )
                         )
 

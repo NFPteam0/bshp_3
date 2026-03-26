@@ -92,19 +92,19 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         if USE_DETAILED_LOG:
             logger.info("Len of _norm classes: %s", len(X[f"{self.y}_norm"].unique()))
         if self.name_col:
-            if USE_DETAILED_LOG:
-                logger.info(
-                    "Pre Encoded dict: %s, %s : %s (%s)",
-                    X[f"pred_{self.name_col}"].iloc[0],
-                    X[f"pred_pp_{self.name_col}"].iloc[0],
-                    list(self.name2code.keys())[0],
-                    list(self.name2code.values())[0],
-                )
-                logger.info(
-                    "Len of pred_name classes: %s %s",
-                    len(X[f"pred_{self.name_col}"].unique()),
-                    len(X[f"pred_pp_{self.name_col}"].unique()),
-                )
+            # if USE_DETAILED_LOG:
+            #     logger.info(
+            #         "Pre Encoded dict: %s, %s : %s (%s)",
+            #         X[f"pred_{self.name_col}"].iloc[0],
+            #         X[f"pred_pp_{self.name_col}"].iloc[0],
+            #         list(self.name2code.keys())[0],
+            #         list(self.name2code.values())[0],
+            #     )
+            #     logger.info(
+            #         "Len of pred_name classes: %s %s",
+            #         len(X[f"pred_{self.name_col}"].unique()),
+            #         len(X[f"pred_pp_{self.name_col}"].unique()),
+            #     )
 
             X[f"pred_{self.name_col}"] = X[f"pred_{self.name_col}"].replace(
                 self.name2code
@@ -120,19 +120,19 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                     .fillna(-1)
                 )
 
-            if USE_DETAILED_LOG:
-                logger.info(
-                    "Encoded dict: %s, %s, %s %s",
-                    X[f"pred_{self.name_col}"].iloc[0],
-                    X[f"pred_pp_{self.name_col}"].iloc[0],
-                    list(self.name2code.keys())[0],
-                    list(self.name2code.values())[0],
-                )
-                logger.info(
-                    "Len of pred_name classes: %s %s",
-                    len(X[f"pred_{self.name_col}"].unique()),
-                    len(X[f"pred_pp_{self.name_col}"].unique()),
-                )
+            # if USE_DETAILED_LOG:
+            #     logger.info(
+            #         "Encoded dict: %s, %s, %s %s",
+            #         X[f"pred_{self.name_col}"].iloc[0],
+            #         X[f"pred_pp_{self.name_col}"].iloc[0],
+            #         list(self.name2code.keys())[0],
+            #         list(self.name2code.values())[0],
+            #     )
+            #     logger.info(
+            #         "Len of pred_name classes: %s %s",
+            #         len(X[f"pred_{self.name_col}"].unique()),
+            #         len(X[f"pred_pp_{self.name_col}"].unique()),
+            #     )
         X[self.y] = X[self.y].replace(r"^\s*$", None, regex=True).fillna(-1).astype(int)
         return X
 

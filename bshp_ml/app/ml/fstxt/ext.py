@@ -171,9 +171,9 @@ class ExtFastTextModel(FastTextModel):
             X.loc[__pp_mask, f"pred_{y}"] = X.loc[__pp_mask, f"pred_pp_{y}"]
             X.loc[__pp_mask, f"prob_{y}"] = X.loc[__pp_mask, f"prob_pp_{y}"]
 
-            THRES = 0.6
-            X.loc[X[f"prob_{y}"] < THRES, f"pred_{y}"] = ""
-            X.loc[X[f"prob_{y}"] < THRES, f"prob_{y}"] = 0
+            # THRES = 0.6
+            # X.loc[X[f"prob_{y}"] < THRES, f"pred_{y}"] = ""
+            # X.loc[X[f"prob_{y}"] < THRES, f"prob_{y}"] = 0
 
             gc.collect()
 

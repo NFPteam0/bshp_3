@@ -7,6 +7,7 @@ RE_CHARS = re.compile(r"[^a-zA-Zа-яА-ЯёЁ0-9\s]")
 RE_SPACES = re.compile(r"\s+")
 RE_NUMBERS = re.compile(r"[^a-zA-Zа-яА-ЯёЁ\s]")
 RE_SMALL = re.compile(r"\b\w{1-2}\b")
+RE_NUMBERS_EXCEPT_YEARS = re.compile(r"(?<!\S)(?!2\d{3}\b)\d+\b")
 
 
 def preprocess_text(s: pd.Series) -> pd.Series:
@@ -15,6 +16,7 @@ def preprocess_text(s: pd.Series) -> pd.Series:
     """
     s = s.fillna("").astype(str).str.lower()
     s = s.str.replace(RE_CHARS, " ", regex=True)
+    s = s.str.replace(RE_NUMBERS_EXCEPT_YEARS, "", regex=True)
     s = s.str.replace(RE_SPACES, " ", regex=True).str.strip()
     s = s.str.replace(RE_SMALL, " ", regex=True)
 

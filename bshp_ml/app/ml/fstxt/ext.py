@@ -1,16 +1,15 @@
 import gc
-import pandas as pd
-from sklearn.pipeline import Pipeline
-from ml.data_processing import NanProcessor
-from ml.fstxt.utils import prepare_sentences
-from schemas.models import ExtEmbedPredictionsRow, ModelTypes
 
-from ml.data_processing import Checker
-from .model import BATCH_SIZE, FastTextModel
-from .model import logger
+import pandas as pd
+from ml.data_processing import Checker, NanProcessor
+from schemas.models import ExtEmbedPredictionsRow, ModelTypes
 from settings import (
     USE_DETAILED_LOG,
 )
+from sklearn.pipeline import Pipeline
+
+from .model import BATCH_SIZE, FastTextModel, logger
+from .utils import build_class_vocab, prepare_sentences_weighted
 
 
 class ExtFastTextModel(FastTextModel):
@@ -134,16 +133,33 @@ class ExtFastTextModel(FastTextModel):
         PP_COLUMNS = ["payment_purpose", "payment_purpose_returned"]
 
         # 3. Preprocess sentences
-        sentences = prepare_sentences(
-            X,
-            ARTICLE_COLUMNS,
-        )
+        # sentences = prepare_sentences(
+        #     X,
+        #     ARTICLE_COLUMNS,
+        # )
 
-        sentences_pp = prepare_sentences(
-            X,
-            PP_COLUMNS,
-        )
+        # sentences_pp = prepare_sentences(
+        #     X,
+        #     PP_COLUMNS,
+        # )
+        class_vocab = build_class_vocab(self.all_classes_names)
 
+        sentences = prepare_sentences_weighted(
+            X,
+            article_cols=ARTICLE_COLUMNS,
+            payment_cols=PP_COLUMNS,
+            class_vocab=class_vocab,
+            payment_weight=2,
+        )
+        # sentences_pp: payment-only path, same filtering, higher weight
+        # since article context is absent here, weight can be 1 (no repetition needed)
+        sentences_pp = prepare_sentences_weighted(
+            X,
+            article_cols=[],
+            payment_cols=PP_COLUMNS,
+            class_vocab=class_vocab,
+            payment_weight=1,
+        )
         # 4. Predict
 
         for y in self.y_columns:

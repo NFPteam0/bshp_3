@@ -4,48 +4,35 @@ import json
 import logging
 import os
 import pickle
-import random
 import shutil
-import uuid
-from abc import ABC, abstractmethod
-from copy import deepcopy
-from datetime import UTC, datetime
-from enum import Enum
-from typing import Optional
-from sklearn import set_config
+
 import numpy as np
 import pandas as pd
-from catboost import CatBoost, Pool
+from catboost import Pool
 from ml.cb.classifier import (
     CatBoostClassifier,
     Pool,
     sum_models,
-    to_classifier,
+)
+from ml.data_processing import (
+    Checker,
+    FeatureAdder,
+    NanProcessor,
 )
 from schemas.models import ModelStatuses, ModelTypes
 from settings import (
-    DATASET_BATCH_LENGTH,
+    DEVICES,
     MODEL_FOLDER,
-    QUANTIZE,
+    TASK_TYPE,
     THREAD_COUNT,
     USE_DETAILED_LOG,
     USED_RAM_LIMIT,
 )
 from sklearn.pipeline import Pipeline
-from .utils import get_none_data_row
-import copy
-from ml.data_processing import (
-    Checker,
-    DataEncoder,
-    FeatureAdder,
-    NanProcessor,
-)
-from db import db_processor
-from tasks.__init__ import Reader
-from ..models import Model
-from .classifier import CatBoostModel, CbCallBack
-from .utils import decode_cat, encode_cat, eval_model, make_all_data
+
+from .classifier import CatBoostModel
 from .data_processing import CBDataEncoder
+from .utils import eval_model, make_all_data
 
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
@@ -254,7 +241,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         )
 
                     params = {
-                        "task_type": "CPU",
+                        "task_type": TASK_TYPE,
                         "iterations": iterations,
                         "learning_rate": lr,
                         "depth": depth,
@@ -264,6 +251,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         "random_seed": SEED,
                         "verbose": USE_DETAILED_LOG * 100,
                         "loss_function": "MultiClass",
+                        "devices": DEVICES,
                     }
 
                     # Обучаем модель

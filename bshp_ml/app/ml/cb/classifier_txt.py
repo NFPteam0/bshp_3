@@ -68,7 +68,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "contract_name",  # TODO: number?
             "accepted_issued",
             "article_parent",
-            "article_group",
+            # "article_group",
         ]
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])
@@ -336,16 +336,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
         df = df.copy()
         # TODO: fsttxt class feature
         # TODO: article_parent rm numbers
-        df["article_parent"] = (
-            df["article_parent"]
-            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
-            .str.strip()
-        )
-        df["article_group"] = (
-            df["article_group"]
-            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
-            .str.strip()
-        )
+        # df["article_parent"] = (
+        #     df["article_parent"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
+        # df["article_group"] = (
+        #     df["article_group"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
 
         UNFEATURED = [
             "company_inn",
@@ -728,16 +728,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
         for y in self.y_columns:
             X[y] = ""
         # set_config(transform_output="pandas")
-        X["article_parent"] = (
-            X["article_parent"]
-            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
-            .str.strip()
-        )
-        X["article_group"] = (
-            X["article_group"]
-            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
-            .str.strip()
-        )
+        # X["article_parent"] = (
+        #     X["article_parent"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
+        # X["article_group"] = (
+        #     X["article_group"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
         X_y = pipeline.fit_transform(X).copy()
         # c_x_columns = self.x_columns + [
         #     "number",

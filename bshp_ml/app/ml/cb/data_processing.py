@@ -153,6 +153,18 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                 X[f"{self.name_col}"].iloc[0],
             )
         X[self.y] = X[f"{self.y}_norm"].map(self.norm2code).fillna(-1)
+
+        THRES = 0.8
+        __txt_mask = X[f"prob_{self.name_col}"] > THRES
+        X.loc[__txt_mask, self.y] = (
+            X.loc[__txt_mask, f"pred_{self.name_col}"]
+            .map(self.name2code)
+            .map(self.norm2code)
+        )
+        X.loc[__txt_mask, f"{self.name_col}"] = X.loc[
+            __txt_mask, f"pred_{self.name_col}"
+        ]
+
         return X
 
     # def _get_decoded_field(self, norm_value):

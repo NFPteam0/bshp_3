@@ -71,22 +71,35 @@ def zero_below_nth_max(df, cols, treshold=0.8, n=10):
     return df_result
 
 
-# 2. Add these two functions after prepare_sentences:
-
-
-def build_class_vocab(all_classes_names: dict) -> set[str]:
+def build_class_vocab(all_classes_names: dict, max_class_freq: float = 0.1) -> set[str]:
     """
-    Build a set of tokens that appear in any class label name.
-    Used to filter noise from input sentences — only tokens
-    that share vocabulary with class names are kept.
+    Build a set of distinctive tokens from class label names.
+    Tokens appearing in more than max_class_freq fraction of class labels
+    are considered generic (like "прочие", "иные", "расходы") and excluded.
+    This way only discriminative tokens survive — ones that actually
+    distinguish one class from another.
     """
-    vocab = set()
+    from collections import Counter
+
+    all_names = []
     for class_list in all_classes_names.values():
-        for name in class_list:
-            tokens = preprocess_text(pd.Series([name])).iloc[0].split()
-            vocab.update(tokens)
-    # remove empty string if present
-    vocab.discard("")
+        all_names.extend(class_list)
+
+    total = len(all_names)
+    token_doc_count: Counter = Counter()
+
+    token_sets = []
+    for name in all_names:
+        tokens = set(preprocess_text(pd.Series([name])).iloc[0].split())
+        tokens.discard("")
+        token_sets.append(tokens)
+        token_doc_count.update(tokens)
+
+    vocab = {
+        token
+        for token, count in token_doc_count.items()
+        if count / total <= max_class_freq
+    }
     return vocab
 
 

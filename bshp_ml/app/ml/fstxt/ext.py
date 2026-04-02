@@ -1,5 +1,7 @@
 import gc
+import logging
 
+import numpy as np
 import pandas as pd
 from ml.data_processing import Checker, NanProcessor
 from schemas.models import ExtEmbedPredictionsRow, ModelTypes
@@ -9,11 +11,35 @@ from settings import (
 from sklearn.pipeline import Pipeline
 
 from .model import BATCH_SIZE, FastTextModel, logger
-from .utils import build_class_vocab, prepare_sentences_weighted
+from .utils import build_class_vocab, prepare_sentences_weighted, preprocess_text
 
 
 class ExtFastTextModel(FastTextModel):
     model_type = ModelTypes.extfstxt
+
+    def build_class_matrix(self, classes, codes, preprocess_labels: bool = False):
+        vectors = []
+        names = []
+        for cls in classes:
+            if preprocess_labels:
+                tokens = tuple(preprocess_text(pd.Series([cls])).iloc[0].split())
+                if not tokens:
+                    tokens = tuple(cls.lower().split())
+            else:
+                tokens = tuple(cls.lower().split())
+            if not tokens:
+                vec = FastTextModel.wv_cached("", self.base_name, self.model_type)
+            else:
+                vec = self.sentence_vector_cached(
+                    tokens, self.base_name, self.model_type
+                )
+            vectors.append(vec)
+            names.append(cls)
+        M = np.vstack(vectors).astype(np.float32)
+
+        M /= np.linalg.norm(M, axis=1, keepdims=True) + 1e-9
+
+        return M, names
 
     def _sync_predict(
         self,
@@ -163,8 +189,13 @@ class ExtFastTextModel(FastTextModel):
         # 4. Predict
 
         for y in self.y_columns:
+            __preprocess_labels = (
+                y != "cash_flow_details_name"
+            )  # for details labels are noisy, preprocessing doesn't help
             class_matrix, class_names = self.build_class_matrix(
-                self.all_classes_names[y], self.all_classes_codes[y]
+                self.all_classes_names[y],
+                self.all_classes_codes[y],
+                preprocess_labels=__preprocess_labels,
             )
 
             preds, probs = self.batched_predict(
@@ -194,6 +225,21 @@ class ExtFastTextModel(FastTextModel):
             # X.loc[X[f"prob_{y}"] < THRES, f"prob_{y}"] = 0
 
             gc.collect()
+
+        if USE_DETAILED_LOG:
+            logging.info(
+                "FSTTXT ITEM ACC = %.2f",
+                len(X[X["pred_cash_flow_item_name"] == X["cash_flow_item_name"]])
+                / len(X),
+            )
+            logging.info(
+                "FSTTXT DETAILS ACC = %.2f",
+                len(X[X["pred_cash_flow_details_name"] == X["cash_flow_details_name"]])
+                / len(X),
+            )
+            logging.info(
+                "FSTTXT YEAR ACC = %.2f", len(X[X["pred_year"] == X["year"]]) / len(X)
+            )
 
         return X.to_json(
             orient="records", force_ascii=False, date_format="iso", date_unit="s"

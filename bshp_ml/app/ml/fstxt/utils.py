@@ -109,13 +109,29 @@ def prepare_sentences_weighted(
     payment_cols: list[str],
     class_vocab: set[str],
     payment_weight: int = 2,
+    word_weight_multipliers: dict[str, float] | None = None,
 ) -> list[list[str]]:
     """
-    Prepares sentences with two improvements:
+    Prepares sentences with improvements:
     - payment_* tokens are filtered to class_vocab only (noise suppression)
       then repeated payment_weight times (signal amplification)
     - article_* tokens are kept as-is (already relatively clean)
+    - word_weight_multipliers applies custom weights to specific words
+      e.g. {'Оплата': 0.3, 'Зерноотходы': 0.6} reduces those words' importance
     """
+    if word_weight_multipliers is None:
+        word_weight_multipliers = {
+            "оплата": 0.3,
+            "зерноотходы": 0.6,
+            "расходы": 0.5,
+        }
+
+    # Preprocess word multipliers to handle different cases
+    word_weight_multipliers = {
+        preprocess_text(pd.Series([k])).iloc[0]: v
+        for k, v in word_weight_multipliers.items()
+    }
+
     present_article = [c for c in article_cols if c in df.columns]
     present_payment = [c for c in payment_cols if c in df.columns]
 
@@ -131,7 +147,11 @@ def prepare_sentences_weighted(
         pp_text = df[present_payment].astype(str).agg(" ".join, axis=1)
         pp_cleaned = preprocess_text(pp_text).str.split()
         pp_tokens = [
-            [t for t in tokens if t in class_vocab] * payment_weight
+            _apply_word_weights(
+                [t for t in tokens if t in class_vocab],
+                payment_weight,
+                word_weight_multipliers,
+            )
             for tokens in pp_cleaned
         ]
     else:
@@ -139,3 +159,19 @@ def prepare_sentences_weighted(
 
     sentences = [a + p for a, p in zip(art_tokens, pp_tokens)]
     return sentences
+
+
+def _apply_word_weights(
+    tokens: list[str], base_weight: int, word_weight_multipliers: dict[str, float]
+) -> list[str]:
+    """
+    Apply custom weight multipliers to tokens.
+    For each token, repeat it base_weight * multiplier times.
+    If no multiplier is set, use base_weight repetitions.
+    """
+    result = []
+    for token in tokens:
+        multiplier = word_weight_multipliers.get(token, 1.0)
+        count = max(1, int(base_weight * multiplier))
+        result.extend([token] * count)
+    return result

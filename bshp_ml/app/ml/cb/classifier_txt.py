@@ -347,19 +347,23 @@ class CatBoostModelEmbeddings(CatBoostModel):
         #     .str.strip()
         # )
 
-        UNFEATURED = [
-            "company_inn",
-            "contractor_name",
-            "contractor_kpp",
-            "qty",
-            "price",
-            "sum",
-            "contractor_account_number",
-            "company_account_number",
-            "article_row_number",
-            "row_number",
-            "number",
-        ] + [f"pred_pp_{y}" for y in self.fsttxt_columns]
+        UNFEATURED = (
+            [
+                "company_inn",
+                "contractor_name",
+                "contractor_kpp",
+                "qty",
+                "price",
+                "sum",
+                "contractor_account_number",
+                "company_account_number",
+                "article_row_number",
+                "row_number",
+                "number",
+            ]
+            + [f"pred_pp_{y}" for y in self.fsttxt_columns]
+            + [f"prob_pp_{y}" for y in self.fsttxt_columns]
+        )
 
         if y != "year":
             UNFEATURED += ["pred_pp_year", "prob_pp_year", "pred_year", "prob_year"]

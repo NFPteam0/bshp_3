@@ -1,11 +1,10 @@
-from datetime import datetime
 import logging
 import os
 import pickle
-import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
-from settings import USE_DETAILED_LOG
 
+import pandas as pd
+from settings import USE_DETAILED_LOG
+from sklearn.base import BaseEstimator, TransformerMixin
 
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
@@ -154,16 +153,9 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             )
         X[self.y] = X[f"{self.y}_norm"].map(self.norm2code).fillna(-1)
 
-        THRES = 0.8
-        __txt_mask = X[f"prob_{self.name_col}"] > THRES
-        X.loc[__txt_mask, self.y] = (
-            X.loc[__txt_mask, f"pred_{self.name_col}"]
-            .map(self.name2code)
-            .map(self.norm2code)
+        X[f"pred_{self.name_col}"] = (
+            X[f"pred_{self.name_col}"].map(self.norm2name).fillna(-1)
         )
-        X.loc[__txt_mask, f"{self.name_col}"] = X.loc[
-            __txt_mask, f"pred_{self.name_col}"
-        ]
 
         return X
 

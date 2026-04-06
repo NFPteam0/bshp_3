@@ -51,7 +51,7 @@ def get_none_data_row(self, parameters):
     return pd.DataFrame([row])
 
 
-def add_data(df: pd.DataFrame, sample_frac: float = 0.25) -> pd.DataFrame:
+def add_data(df: pd.DataFrame, sample_frac: float = 0.05) -> pd.DataFrame:
     """
     Добавить в датасет сгенерированные данные для повышения веса pred_* полей.
     Создаёт примеры с минимальной информацией (только pred_* и финансовые данные),

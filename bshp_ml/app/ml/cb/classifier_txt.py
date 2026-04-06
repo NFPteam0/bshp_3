@@ -32,7 +32,7 @@ from sklearn.pipeline import Pipeline
 
 from .classifier import CatBoostModel
 from .data_processing import CBDataEncoder
-from .utils import eval_model, make_all_data
+from .utils import add_data, eval_model, make_all_data
 
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
@@ -625,6 +625,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
         is_first = True  # TODO: ?
         if USE_DETAILED_LOG:
             logger.info("{} fit".format("First" if is_first else "continuous"))
+
+        df = add_data(df)
 
         for y in self.y_columns:
             self.strict_acc[y] = {}

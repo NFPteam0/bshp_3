@@ -63,7 +63,7 @@ async def fit(
         task_id = str(uuid.uuid4())
         task = await task_manager.create_task(task_id)
         logger.info(
-            f"Start fitting model {ModelTypes.fstxt} on {'all_bases'}, TASK ID {task.task_id}"
+            f"Start fitting model {ModelTypes.extfstxt} on {'all_bases'}, TASK ID {task.task_id}"
         )
 
         try:
@@ -72,7 +72,7 @@ async def fit(
                 type="FIT",
                 status="PREPARE_FITTING",
                 upload_progress=100,
-                model_type=ModelTypes.fstxt.value,
+                model_type=ModelTypes.extfstxt.value,
                 base_name="all_bases",
                 parameters=parameters,
             )
@@ -100,9 +100,11 @@ async def fit(
         logger.error(
             f"Collection not found. Please, insure base {base_name} is loaded: {e}"
         )
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(
+            status_code=404, detail=f"No data. Save the data from 1C. Detail: {str(e)}"
+        )
     try:
-        fsttext = model_manager.get_model(ModelTypes.fstxt, "all_bases")
+        fsttext = model_manager.get_model(ModelTypes.extfstxt, "all_bases")
         # модель фасттекст для всех баз одна
         Xy_embed = await fsttext.predict(X_y, set_classes=True)
         Xy_json = json.loads(Xy_embed)
@@ -168,7 +170,19 @@ async def predict(
         )
         raise HTTPException(status_code=404, detail=str(e))
     try:
-        fsttext = model_manager.get_model(ModelTypes.fstxt, "all_bases")
+        dataset = await _read_dataset({"data_filter": {"base_name": base_name}})
+        if USE_DETAILED_LOG:
+            logging.info("Loading columns: %s, %s", dataset.columns, dataset.shape)
+        if dataset.empty:
+            raise ValueError
+    except Exception as e:
+        print(traceback.format_exc())
+        logger.error(
+            f"Collection not found. Please, insure base {base_name} is loaded: {e}"
+        )
+        raise HTTPException(status_code=404, detail=str(e))
+    try:
+        fsttext = model_manager.get_model(ModelTypes.extfstxt, "all_bases")
         Xy_embed = await fsttext.predict(
             jsonable_encoder(X), set_classes=True, set_from=dataset
         )

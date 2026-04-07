@@ -4,6 +4,8 @@ services:
   app:
     container_name: bshp_v3
     image: dark_h14/bshp_v3:latest
+    env_file:
+      - .env
     environment:
       - DB_HOST=db
       - DB_PORT=27017

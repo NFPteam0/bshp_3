@@ -4,48 +4,35 @@ import json
 import logging
 import os
 import pickle
-import random
 import shutil
-import uuid
-from abc import ABC, abstractmethod
-from copy import deepcopy
-from datetime import UTC, datetime
-from enum import Enum
-from typing import Optional
-from sklearn import set_config
+
 import numpy as np
 import pandas as pd
-from catboost import CatBoost, Pool
+from catboost import Pool
 from ml.cb.classifier import (
     CatBoostClassifier,
     Pool,
     sum_models,
-    to_classifier,
+)
+from ml.data_processing import (
+    Checker,
+    FeatureAdder,
+    NanProcessor,
 )
 from schemas.models import ModelStatuses, ModelTypes
 from settings import (
-    DATASET_BATCH_LENGTH,
+    DEVICES,
     MODEL_FOLDER,
-    QUANTIZE,
+    TASK_TYPE,
     THREAD_COUNT,
     USE_DETAILED_LOG,
     USED_RAM_LIMIT,
 )
 from sklearn.pipeline import Pipeline
-from .utils import get_none_data_row
-import copy
-from ml.data_processing import (
-    Checker,
-    DataEncoder,
-    FeatureAdder,
-    NanProcessor,
-)
-from db import db_processor
-from tasks.__init__ import Reader
-from ..models import Model
-from .classifier import CatBoostModel, CbCallBack
-from .utils import decode_cat, encode_cat, eval_model, make_all_data
+
+from .classifier import CatBoostModel
 from .data_processing import CBDataEncoder
+from .utils import eval_model, make_all_data
 
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
@@ -81,10 +68,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "contract_name",  # TODO: number?
             "accepted_issued",
             "article_parent",
+            # "article_group",
         ]
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])
         self.categorical.extend([f"pred_{y}" for y in self.fsttxt_columns])
+
+        # self.categorical.extend([f"pred_pp_{y}" for y in self.fsttxt_columns])
+        # self.float_columns.extend([f"prob_pp_{y}" for y in self.fsttxt_columns])
+        self.float_columns.extend([f"class_rate_{y}" for y in self.fsttxt_columns])
+
         self.str_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
             + [
@@ -102,8 +95,19 @@ class CatBoostModelEmbeddings(CatBoostModel):
         )
         self.x_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
-            + ["payment_purpose", "contract_name", "contract_number", "accepted_issued"]
+            + [f"class_rate_{y}" for y in self.fsttxt_columns]
+            + [
+                "payment_purpose",
+                "contract_name",
+                "contract_number",
+                "accepted_issued",
+                "sin_month",
+                "cos_month",
+                "sin_day",
+                "cos_day",
+            ]
         )
+        self.float_columns.extend(["sin_month", "cos_month", "sin_day", "cos_day"])
         self.columns_to_encode = self.categorical
 
         self.date_columns = [
@@ -136,14 +140,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
         test_pool: Pool,
         all_data: pd.DataFrame,
     ) -> CatBoostClassifier:
-        """Trains one catboost model.
+        """Trains one catboost model from scratch.
         <b>NOTE: before fitting add columns from fasttext model</b>"""
         model = None
         model_new = None
 
-        # test_pool = self.get_test_pool(
-        #     df_test=df_test, y=y, to_drop=to_drop, cat_idxs=cat_idxs
-        # )
         BSIZE = 10_000
         for n, batch in enumerate(
             self.get_batch_pool(
@@ -179,8 +180,18 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 model = sum_models(
                     [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
                 )  # TODO: weights = [1/2] * 2?
-            del model_new
-            gc.collect()
+                del model_new
+                gc.collect()
+
+        # model_new = CatBoostClassifier(**params)
+        # test_base = model.predict(test_pool, prediction_type="RawFormulaVal")
+        # test_base[np.isneginf(test_base)] = -1
+        # test_pool.set_baseline(test_base)
+
+        # model_new.fit(X=test_pool, eval_set=test_pool)
+        # model = sum_models(
+        #     [model, model_new], ctr_merge_policy="IntersectingCountersAverage"
+        # )
         return model
 
     def gridsearch(
@@ -195,6 +206,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         all_data: pd.DataFrame,
         lr=0.01,
         trees=20,
+        _df_latest: None | pd.DataFrame = None,
     ):
         """
         Traines few models and choses best based on a given catboost parametrs
@@ -202,18 +214,15 @@ class CatBoostModelEmbeddings(CatBoostModel):
         param_grid = {
             "learning_rate": [
                 # lr,
-                #   0.002,
-                # 0.017,
                 None,
             ],
             "depth": [6],
             "iterations": [
-                trees,
+                # trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
-                100,
-                # 200,
-                #   400,
+                2**7,
+                # 400,
             ],
             "l2_leaf_reg": [4],
         }
@@ -232,7 +241,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         )
 
                     params = {
-                        "task_type": "CPU",
+                        "task_type": TASK_TYPE,
                         "iterations": iterations,
                         "learning_rate": lr,
                         "depth": depth,
@@ -240,8 +249,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         "early_stopping_rounds": int(iterations * 0.8) + 1,
                         "use_best_model": True,
                         "random_seed": SEED,
-                        "verbose": 0,
+                        "verbose": USE_DETAILED_LOG * 100,
                         "loss_function": "MultiClass",
+                        "devices": DEVICES,
                     }
 
                     # Обучаем модель
@@ -257,25 +267,61 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     )
 
                     # Оцениваем accuracy на тестовой выборке
-                    # test_pool = Pool(
-                    #     X_test,
-                    #     label=y_test,
-                    #     cat_features=cat_idxs,
-                    # )
                     preds = current_model.predict(test_pool, prediction_type="Class")
-                    acc, f1 = eval_model(df_test[f"{y}"], preds)
-                    if USE_DETAILED_LOG:
-                        logger.info(f"Accuracy: {acc:.4f}")
 
+                    acc, f1 = eval_model(df_test[f"{y}"], preds)
+                    tacc, _ = eval_model(
+                        df_train[f"{y}"],
+                        current_model.predict(df_train, prediction_type="Class"),
+                    )
+
+                    acc_after_test, _ = eval_model(df_test[f"{y}"], preds)
+                    if USE_DETAILED_LOG:
+                        logger.info(f"Accuracy: {acc_after_test:.4f}")
                     # Сохраняем лучшую модель
                     if acc > best_score:
                         best_score = acc
-                        best_model = current_model
+
                         best_params = params
                         if USE_DETAILED_LOG:
                             logger.info(
-                                f"*** New best model! Accuracy: {acc:.4f} *** Best params: {best_params}"
+                                f"*** New best model! Test Accuracy: {acc:.4f} ***, ***train accuracy: {tacc:.4f}*** Best params: {best_params}"
                             )
+
+                        if USE_DETAILED_LOG:
+                            logger.info(f"Accuracy: {acc:.4f}")
+                            logger.info("Learn on test data...")
+
+                        if USE_DETAILED_LOG:
+                            logger.info(
+                                f"Model loss_function: {current_model.get_params().get('loss_function')}"
+                            )
+                            logger.info(
+                                f"Model classes_count: {current_model.get_params().get('classes_count')}"
+                            )
+                            logger.info(
+                                f"Baseline shape: {test_pool.get_baseline().shape if test_pool.get_baseline() is not None else None}"
+                            )
+
+                        if _df_latest is not None and len(_df_latest) > 0:
+                            final_batch = pd.concat(
+                                [df_test, _df_latest], ignore_index=True
+                            )
+                        else:
+                            final_batch = df_test
+
+                        # Дообучить для прода
+                        _params = params.copy()
+                        _params["use_best_model"] = False
+
+                        current_model_test = CatBoostClassifier(**_params)
+                        current_model_test = current_model_test.fit(
+                            X=final_batch.drop(y, axis=1),
+                            y=final_batch[y],
+                            init_model=current_model,
+                            cat_features=cat_idxs,
+                        )
+                        best_model = current_model_test
         return best_model
 
     def train_on_field(
@@ -286,8 +332,21 @@ class CatBoostModelEmbeddings(CatBoostModel):
             logger.info(f"Predict {len(df[y])} records")
 
         bscores = []
-        # total_preds = pd.DataFrame(index=df.index)
+
         df = df.copy()
+        # TODO: fsttxt class feature
+        # TODO: article_parent rm numbers
+        # df["article_parent"] = (
+        #     df["article_parent"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
+        # df["article_group"] = (
+        #     df["article_group"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
+
         UNFEATURED = [
             "company_inn",
             "contractor_name",
@@ -300,15 +359,37 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "article_row_number",
             "row_number",
             "number",
-        ]
+        ] + [f"pred_pp_{y}" for y in self.fsttxt_columns]
+
+        if y != "year":
+            UNFEATURED += ["pred_pp_year", "prob_pp_year", "pred_year", "prob_year"]
+
+        categorical = [col for col in self.categorical if col not in UNFEATURED]
+
+        _df_latest = (
+            df.sort_values(
+                by=["document_year", "document_month"], ascending=[True, True]
+            )
+            .tail(10_000)
+            .copy()
+        )
         df = df.drop(
             labels=[
                 col
                 for col in UNFEATURED
-                if col not in self.categorical and col in df.columns
+                if col not in categorical and col in df.columns
             ],
             axis=1,
         )
+        _df_latest = _df_latest.drop(
+            labels=[
+                col
+                for col in UNFEATURED
+                if col not in categorical and col in df.columns
+            ],
+            axis=1,
+        )
+        _df_latest = _df_latest[df.columns]
         # drop here? No ' '(-1) for models?
 
         if y == "cash_flow_details_code":
@@ -344,7 +425,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         for c in self.str_columns
                         + self.fsttxt_columns
                         + ["uploading_date"]
-                        if (c in df_i.columns and c not in self.categorical)
+                        if (c in df_i.columns and c not in categorical)
                     ]
                 )
 
@@ -360,7 +441,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                     this_label = all_data[f"{y}_norm"].iloc[0]
                     bscores.extend([1 for _ in range(len(df_i[f"{y}_norm"]))])
-                    print("Only one details code, no need for model")
+                    logger.info("Only one details code, no need for model")
                     # TODO: сохранить словарь
                     self.strict_acc[y][int(item)] = this_label
                     continue
@@ -370,7 +451,14 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 all_data = make_all_data(df_i, f"{y}_norm")
                 all_classes = all_data[f"{y}_norm"].unique()
 
-                df_test = df_i.sample(frac=0.1, random_state=SEED)
+                df_test = df_i.sample(frac=0.15, random_state=SEED)
+
+                _df_latest_i = encoder.transform(_df_latest)
+                _df_latest_i.drop(to_drop, inplace=True, axis=1)
+                _df_latest_i = _df_latest_i.query(
+                    f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1"
+                )
+
                 df_train = df_i.drop(df_test.index)
 
                 if len(df_test) == 0:
@@ -385,7 +473,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # cats indxs
                 cat_idxs = [
                     df_i.columns.get_loc(key=cat)
-                    for cat in self.categorical
+                    for cat in categorical
                     if cat in df_i.columns
                 ]
 
@@ -414,6 +502,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     lr=parameters.get("lr", 0.01),
                     trees=parameters.get("trees", 30),
                     all_data=all_data,
+                    _df_latest=_df_latest_i,
                 )
                 self.field_models[y][int(item)] = model_i
 
@@ -436,10 +525,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         else:
             if USE_DETAILED_LOG:
                 logger.info(f"Found {len(df[y])} records")
-            # det_map1 = {name: num for num, name in enumerate(df[y].unique())}
-            # det_unmap1 = {v: k for k, v in det_map1.items()}
 
-            # df[f"{y}_norm"] = df[y].copy().map(det_map1)
             encoder = CBDataEncoder(
                 parameters=self.parameters,
                 y_col=y,
@@ -476,30 +562,22 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                 this_label = all_data[f"{y}_norm"].iloc[0]
                 bscores.extend([1 for _ in range(len(df[f"{y}_norm"]))])
-                # total_preds.loc[df.index, f"{y}_pred"] = [
-                #     this_label for _ in range(len(df))
-                # ]
-                # (f"Only one {y} code, no need for model")
                 self.strict_acc[y] = this_label
                 return
-            # if y == "year":
-            #     year_mask = df.groupby(ITEM)[f"{ITEM}"].apply(
-            #         lambda x: ((x.str.strip() != "") & (x != -1)).any()
-            #     )
-            #     self.items_wo_year = set(year_mask[~year_mask].index.astype(int))
-            #     if USE_DETAILED_LOG:
-            #         logging.info(
-            #             "Items without year: %s,\n Items with year: %s",
-            #             len(self.items_wo_year),
-            #             len(set(year_mask[year_mask].index.astype(int))),
-            #         )
 
             # X, y train
             df = df.query(f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1")
             all_data = make_all_data(df, f"{y}_norm")
             all_classes = all_data[f"{y}_norm"].unique()
 
-            df_test = df.sample(frac=0.1, random_state=SEED)
+            df_test = df.sample(frac=0.15, random_state=SEED)
+
+            _df_latest = encoder.transform(_df_latest)
+            _df_latest.drop(to_drop, inplace=True, axis=1)
+            _df_latest = _df_latest.query(
+                f"`{y}_norm` not in ['', ' '] and `{y}_norm` != -1"
+            )
+
             df_train = df.drop(df_test.index)
 
             cat_idxs = [
@@ -535,6 +613,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 lr=parameters.get("lr", 0.01),
                 trees=parameters.get("trees", 30),
                 all_data=all_data,
+                _df_latest=_df_latest,
             )
             self.field_models[y] = model_i
             self._save_cb_model(model_i, y)
@@ -649,8 +728,17 @@ class CatBoostModelEmbeddings(CatBoostModel):
         for y in self.y_columns:
             X[y] = ""
         # set_config(transform_output="pandas")
+        # X["article_parent"] = (
+        #     X["article_parent"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
+        # X["article_group"] = (
+        #     X["article_group"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
         X_y = pipeline.fit_transform(X).copy()
-
         # c_x_columns = self.x_columns + [
         #     "number",
         #     "date",
@@ -674,8 +762,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 logger.info('Start predicting. Field = "{}"'.format(y))
             if y == "cash_flow_details_code":
                 cash_flow_items = list(X_y["cash_flow_item_code"].unique().astype(int))
-                # X_y["row_number"] = row_numbers
-                # X_y_list = []
 
                 for ind, item_col in enumerate(cash_flow_items):
                     if USE_DETAILED_LOG:
@@ -720,7 +806,25 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         )
 
                         y_pred = model.predict(X_pool, prediction_type="Class")
+
                         Xy1[f"{y}_norm"] = y_pred.ravel()
+
+                        if USE_DETAILED_LOG:
+                            logging.info(f"Feature names: {model.feature_names_}")
+                            importance = (
+                                pd.DataFrame(
+                                    {
+                                        "imp": model.get_feature_importance(),
+                                        "names": model.feature_names_,
+                                    }
+                                )
+                                .sort_values("imp", ascending=False)
+                                .head()
+                            )
+                            logging.info(
+                                f"For {y} most important fields are:\n%s",
+                                importance.to_json,
+                            )
                     Xy1 = encoder.inverse_transform(Xy1)
                     # X_y[X_y["cash_flow_item_code"] == item_col][y] = Xy1[y]
 
@@ -788,6 +892,19 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     X_y = encoder.inverse_transform(X_y)
                     # if y == "year":
                     #     X_y.loc[year_mask, y] = ""
+
+                    if USE_DETAILED_LOG:
+                        _js = json.loads(
+                            X_y.to_json(
+                                orient="records",
+                                force_ascii=False,
+                            )
+                        )
+                        logger.info(
+                            'Predictions ITEM: \n"{}"'.format(
+                                json.dumps(_js, indent=4, ensure_ascii=False)
+                            )
+                        )
 
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))
@@ -1155,30 +1272,3 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
     def _load_encoder(self):
         pass
-
-
-# class CbCallBack:
-#     def after_iteration(self, info):
-#         if USE_DETAILED_LOG:
-#             if info.metrics.get("validation"):
-#                 logger.info(
-#                     "{}: - loss = {}, test loss = {}".format(
-#                         info.iteration,
-#                         info.metrics["learn"][list(info.metrics["learn"].keys())[0]][
-#                             -1
-#                         ],
-#                         info.metrics["validation"][
-#                             list(info.metrics["validation"].keys())[0]
-#                         ][-1],
-#                     )
-#                 )
-#             else:
-#                 logger.info(
-#                     "{}: - loss = {}".format(
-#                         info.iteration,
-#                         info.metrics["learn"][list(info.metrics["learn"].keys())[0]][
-#                             -1
-#                         ],
-#                     )
-#                 )
-#         return True

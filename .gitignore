@@ -8,6 +8,7 @@
 *.env
 *.mdl
 
+.vscode
 /.venv/*
 /.vscode/*
 .env
@@ -19,3 +20,4 @@
 __pycache__
 /bshp_ml/app/catboost_info
 /models/
+___*

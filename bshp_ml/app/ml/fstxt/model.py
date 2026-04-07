@@ -216,6 +216,7 @@ class FastTextModel(Model):
         pipeline = Pipeline(pipeline_list)
         if USE_DETAILED_LOG:
             logger.warning("Predicting, Shape %s", X.shape)
+            logger.warning("Predicting, Shape %s", X.shape)
         try:
             X = pipeline.fit_transform(X)
         except ValueError as e:

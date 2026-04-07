@@ -170,6 +170,18 @@ async def predict(
         )
         raise HTTPException(status_code=404, detail=str(e))
     try:
+        dataset = await _read_dataset({"data_filter": {"base_name": base_name}})
+        if USE_DETAILED_LOG:
+            logging.info("Loading columns: %s, %s", dataset.columns, dataset.shape)
+        if dataset.empty:
+            raise ValueError
+    except Exception as e:
+        print(traceback.format_exc())
+        logger.error(
+            f"Collection not found. Please, insure base {base_name} is loaded: {e}"
+        )
+        raise HTTPException(status_code=404, detail=str(e))
+    try:
         fsttext = model_manager.get_model(ModelTypes.extfstxt, "all_bases")
         Xy_embed = await fsttext.predict(
             jsonable_encoder(X), set_classes=True, set_from=dataset

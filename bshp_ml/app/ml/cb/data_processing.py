@@ -6,6 +6,7 @@ import pandas as pd
 from settings import USE_DETAILED_LOG
 from sklearn.base import BaseEstimator, TransformerMixin
 
+
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
 

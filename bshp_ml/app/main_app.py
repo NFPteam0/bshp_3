@@ -40,7 +40,9 @@ from settings import AUTH_SERVICE_URL, DB_URL, TEST_MODE, VERSION
 from tasks.processing import process_fitting_model, process_uploading_task
 from db import db_processor
 from tasks import task_manager
+import pandas as pd
 
+pd.set_option("future.no_silent_downcasting", True)
 
 logging.basicConfig(
     level=logging.INFO,

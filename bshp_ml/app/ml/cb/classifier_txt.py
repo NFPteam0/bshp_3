@@ -4,48 +4,35 @@ import json
 import logging
 import os
 import pickle
-import random
 import shutil
-import uuid
-from abc import ABC, abstractmethod
-from copy import deepcopy
-from datetime import UTC, datetime
-from enum import Enum
-from typing import Optional
-from sklearn import set_config
+
 import numpy as np
 import pandas as pd
-from catboost import CatBoost, Pool
+from catboost import Pool
 from ml.cb.classifier import (
     CatBoostClassifier,
     Pool,
     sum_models,
-    to_classifier,
+)
+from ml.data_processing import (
+    Checker,
+    FeatureAdder,
+    NanProcessor,
 )
 from schemas.models import ModelStatuses, ModelTypes
 from settings import (
-    DATASET_BATCH_LENGTH,
+    DEVICES,
     MODEL_FOLDER,
-    QUANTIZE,
+    TASK_TYPE,
     THREAD_COUNT,
     USE_DETAILED_LOG,
     USED_RAM_LIMIT,
 )
 from sklearn.pipeline import Pipeline
-from .utils import get_none_data_row
-import copy
-from ml.data_processing import (
-    Checker,
-    DataEncoder,
-    FeatureAdder,
-    NanProcessor,
-)
-from db import db_processor
-from tasks.__init__ import Reader
-from ..models import Model
-from .classifier import CatBoostModel, CbCallBack
-from .utils import decode_cat, encode_cat, eval_model, make_all_data
+
+from .classifier import CatBoostModel
 from .data_processing import CBDataEncoder
+from .utils import eval_model, make_all_data
 
 logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
@@ -81,13 +68,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "contract_name",  # TODO: number?
             "accepted_issued",
             "article_parent",
+            # "article_group",
         ]
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
         self.float_columns.extend([f"prob_{y}" for y in self.fsttxt_columns])
         self.categorical.extend([f"pred_{y}" for y in self.fsttxt_columns])
 
-        self.categorical.extend([f"pred_pp_{y}" for y in self.fsttxt_columns])
-        self.float_columns.extend([f"prob_pp_{y}" for y in self.fsttxt_columns])
+        # self.categorical.extend([f"pred_pp_{y}" for y in self.fsttxt_columns])
+        # self.float_columns.extend([f"prob_pp_{y}" for y in self.fsttxt_columns])
+        self.float_columns.extend([f"class_rate_{y}" for y in self.fsttxt_columns])
+
         self.str_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
             + [
@@ -105,6 +95,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         )
         self.x_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
+            + [f"class_rate_{y}" for y in self.fsttxt_columns]
             + [
                 "payment_purpose",
                 "contract_name",
@@ -149,7 +140,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         test_pool: Pool,
         all_data: pd.DataFrame,
     ) -> CatBoostClassifier:
-        """Trains one catboost model.
+        """Trains one catboost model from scratch.
         <b>NOTE: before fitting add columns from fasttext model</b>"""
         model = None
         model_new = None
@@ -227,7 +218,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             ],
             "depth": [6],
             "iterations": [
-                trees,
+                # trees,
                 # trees * 2,
                 # max(int(trees * 0.7), 1),
                 2**7,
@@ -250,7 +241,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         )
 
                     params = {
-                        "task_type": "CPU",
+                        "task_type": TASK_TYPE,
                         "iterations": iterations,
                         "learning_rate": lr,
                         "depth": depth,
@@ -260,6 +251,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         "random_seed": SEED,
                         "verbose": USE_DETAILED_LOG * 100,
                         "loss_function": "MultiClass",
+                        "devices": DEVICES,
                     }
 
                     # Обучаем модель
@@ -344,11 +336,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
         df = df.copy()
         # TODO: fsttxt class feature
         # TODO: article_parent rm numbers
-        df["article_parent"] = (
-            df["article_parent"]
-            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
-            .str.strip()
-        )
+        # df["article_parent"] = (
+        #     df["article_parent"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
+        # df["article_group"] = (
+        #     df["article_group"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
 
         UNFEATURED = [
             "company_inn",
@@ -362,9 +359,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "article_row_number",
             "row_number",
             "number",
-        ]
+        ] + [f"pred_pp_{y}" for y in self.fsttxt_columns]
+
         if y != "year":
             UNFEATURED += ["pred_pp_year", "prob_pp_year", "pred_year", "prob_year"]
+
+        categorical = [col for col in self.categorical if col not in UNFEATURED]
 
         _df_latest = (
             df.sort_values(
@@ -377,7 +377,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             labels=[
                 col
                 for col in UNFEATURED
-                if col not in self.categorical and col in df.columns
+                if col not in categorical and col in df.columns
             ],
             axis=1,
         )
@@ -385,7 +385,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             labels=[
                 col
                 for col in UNFEATURED
-                if col not in self.categorical and col in df.columns
+                if col not in categorical and col in df.columns
             ],
             axis=1,
         )
@@ -425,7 +425,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         for c in self.str_columns
                         + self.fsttxt_columns
                         + ["uploading_date"]
-                        if (c in df_i.columns and c not in self.categorical)
+                        if (c in df_i.columns and c not in categorical)
                     ]
                 )
 
@@ -473,7 +473,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 # cats indxs
                 cat_idxs = [
                     df_i.columns.get_loc(key=cat)
-                    for cat in self.categorical
+                    for cat in categorical
                     if cat in df_i.columns
                 ]
 
@@ -728,11 +728,16 @@ class CatBoostModelEmbeddings(CatBoostModel):
         for y in self.y_columns:
             X[y] = ""
         # set_config(transform_output="pandas")
-        X["article_parent"] = (
-            X["article_parent"]
-            .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
-            .str.strip()
-        )
+        # X["article_parent"] = (
+        #     X["article_parent"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
+        # X["article_group"] = (
+        #     X["article_group"]
+        #     .str.replace(r"[^a-zA-Zа-яА-ЯёЁ\s]", " ", regex=True)
+        #     .str.strip()
+        # )
         X_y = pipeline.fit_transform(X).copy()
         # c_x_columns = self.x_columns + [
         #     "number",
@@ -757,8 +762,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 logger.info('Start predicting. Field = "{}"'.format(y))
             if y == "cash_flow_details_code":
                 cash_flow_items = list(X_y["cash_flow_item_code"].unique().astype(int))
-                # X_y["row_number"] = row_numbers
-                # X_y_list = []
 
                 for ind, item_col in enumerate(cash_flow_items):
                     if USE_DETAILED_LOG:
@@ -803,7 +806,25 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         )
 
                         y_pred = model.predict(X_pool, prediction_type="Class")
+
                         Xy1[f"{y}_norm"] = y_pred.ravel()
+
+                        if USE_DETAILED_LOG:
+                            logging.info(f"Feature names: {model.feature_names_}")
+                            importance = (
+                                pd.DataFrame(
+                                    {
+                                        "imp": model.get_feature_importance(),
+                                        "names": model.feature_names_,
+                                    }
+                                )
+                                .sort_values("imp", ascending=False)
+                                .head()
+                            )
+                            logging.info(
+                                f"For {y} most important fields are:\n%s",
+                                importance.to_json,
+                            )
                     Xy1 = encoder.inverse_transform(Xy1)
                     # X_y[X_y["cash_flow_item_code"] == item_col][y] = Xy1[y]
 
@@ -871,6 +892,19 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     X_y = encoder.inverse_transform(X_y)
                     # if y == "year":
                     #     X_y.loc[year_mask, y] = ""
+
+                    if USE_DETAILED_LOG:
+                        _js = json.loads(
+                            X_y.to_json(
+                                orient="records",
+                                force_ascii=False,
+                            )
+                        )
+                        logger.info(
+                            'Predictions ITEM: \n"{}"'.format(
+                                json.dumps(_js, indent=4, ensure_ascii=False)
+                            )
+                        )
 
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))

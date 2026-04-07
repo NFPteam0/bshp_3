@@ -1,10 +1,10 @@
-from datetime import datetime
 import logging
 import os
 import pickle
+
 import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
 from settings import USE_DETAILED_LOG
+from sklearn.base import BaseEstimator, TransformerMixin
 
 
 logging.getLogger("bshp_data_processing_logger")
@@ -28,7 +28,7 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         X[self.y] = X[self.y].astype(int)
 
         self.set_mapping(X)
-        # self.set_txt_class_rate(X)
+        self.set_txt_class_rate(X)
 
         if USE_DETAILED_LOG:
             logger.info("Len of classes: %s", len(X[self.y].unique()))
@@ -55,7 +55,8 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
 
         self.code2norm = dict(zip(self.df["code1c"].astype(int), self.df["code_norm"]))
         self.norm2code = dict(zip(self.df["code_norm"], self.df["code1c"].astype(int)))
-        self.code2name = dict(zip(self.df["code_norm"], self.df["name"]))
+        self.norm2name = dict(zip(self.df["code_norm"], self.df["name"]))
+        self.code2name = dict(zip(self.df["code1c"], self.df["name"]))
         self.name2code = dict(zip(self.df["name"], self.df["code_norm"]))
 
     def set_txt_class_rate(self, X: pd.DataFrame):
@@ -63,10 +64,19 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         name = self.name_col
 
         if f"pred_{name}" in X.columns and name in X.columns:
+            # rate для класса: как часто именно его угадывает
+            # текстовая модель (на обучающей выборке)
             self.code2rate = {
-                code: len(X[X[f"pred_{name}"] == X[f"{name}"] & X[name] == code])
-                / len(X[X[f"pred_{y}"] == code])
-                for code in self.all_classes_codes
+                code: len(
+                    X[
+                        (X[f"pred_{name}"] == X[f"{name}"])
+                        & (X[name] == self.code2name[code])
+                    ]
+                )
+                / len(X[X[f"{name}"] == self.code2name[code]])
+                if len(X[X[f"{name}"] == self.code2name[code]]) != 0
+                else 0
+                for code in self.code2norm.keys()
             }
         else:
             self.code2rate = None
@@ -79,45 +89,50 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
             logger.info("Encoding, shape: %s", str(X.shape))
 
         X[f"{self.y}_norm"] = X[self.y].map(self.code2norm).fillna(-1).astype(int)
-        logger.info("Len of _norm classes: %s", len(X[f"{self.y}_norm"].unique()))
+        if USE_DETAILED_LOG:
+            logger.info("Len of _norm classes: %s", len(X[f"{self.y}_norm"].unique()))
         if self.name_col:
-            if USE_DETAILED_LOG:
-                logger.info(
-                    "Pre Encoded dict: %s, %s : %s (%s)",
-                    X[f"pred_{self.name_col}"].iloc[0],
-                    X[f"pred_pp_{self.name_col}"].iloc[0],
-                    list(self.name2code.keys())[0],
-                    list(self.name2code.values())[0],
-                )
-                logger.info(
-                    "Len of pred_name classes: %s %s",
-                    len(X[f"pred_{self.name_col}"].unique()),
-                    len(X[f"pred_pp_{self.name_col}"].unique()),
-                )
+            # if USE_DETAILED_LOG:
+            #     logger.info(
+            #         "Pre Encoded dict: %s, %s : %s (%s)",
+            #         X[f"pred_{self.name_col}"].iloc[0],
+            #         X[f"pred_pp_{self.name_col}"].iloc[0],
+            #         list(self.name2code.keys())[0],
+            #         list(self.name2code.values())[0],
+            #     )
+            #     logger.info(
+            #         "Len of pred_name classes: %s %s",
+            #         len(X[f"pred_{self.name_col}"].unique()),
+            #         len(X[f"pred_pp_{self.name_col}"].unique()),
+            #     )
 
             X[f"pred_{self.name_col}"] = X[f"pred_{self.name_col}"].replace(
                 self.name2code
             )
-            X[f"pred_pp_{self.name_col}"] = X[f"pred_pp_{self.name_col}"].replace(
-                self.name2code
-            )
-            # X[f"class_rate_{self.name_col}"] = X[f"pred_{self.name_col}"].map(
-            #     self.code2rate
+            # X[f"pred_pp_{self.name_col}"] = X[f"pred_pp_{self.name_col}"].replace(
+            #     self.name2code
             # )
+            if self.code2rate is not None:
+                X[f"class_rate_{self.name_col}"] = (
+                    X[f"pred_{self.name_col}"]
+                    .map(self.norm2code)
+                    .map(self.code2rate)
+                    .fillna(-1)
+                )
 
-            if USE_DETAILED_LOG:
-                logger.info(
-                    "Encoded dict: %s, %s, %s %s",
-                    X[f"pred_{self.name_col}"].iloc[0],
-                    X[f"pred_pp_{self.name_col}"].iloc[0],
-                    list(self.name2code.keys())[0],
-                    list(self.name2code.values())[0],
-                )
-                logger.info(
-                    "Len of pred_name classes: %s %s",
-                    len(X[f"pred_{self.name_col}"].unique()),
-                    len(X[f"pred_pp_{self.name_col}"].unique()),
-                )
+            # if USE_DETAILED_LOG:
+            #     logger.info(
+            #         "Encoded dict: %s, %s, %s %s",
+            #         X[f"pred_{self.name_col}"].iloc[0],
+            #         X[f"pred_pp_{self.name_col}"].iloc[0],
+            #         list(self.name2code.keys())[0],
+            #         list(self.name2code.values())[0],
+            #     )
+            #     logger.info(
+            #         "Len of pred_name classes: %s %s",
+            #         len(X[f"pred_{self.name_col}"].unique()),
+            #         len(X[f"pred_pp_{self.name_col}"].unique()),
+            #     )
         X[self.y] = X[self.y].replace(r"^\s*$", None, regex=True).fillna(-1).astype(int)
         return X
 
@@ -125,7 +140,7 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
         X = X.copy()
         if self.name_col != "year":
             # predicted name to corresponding label
-            X[f"{self.name_col}"] = X[f"{self.y}_norm"].map(self.code2name).fillna("")
+            X[f"{self.name_col}"] = X[f"{self.y}_norm"].map(self.norm2name).fillna("")
 
             # X[self.y] = X[X[self.y] == -1][f"pred_{self.name_col}"].map(self.name2code)
             # X[self.name_col] = X[f"pred_{self.name_col}"]
@@ -138,6 +153,11 @@ class CBDataEncoder(BaseEstimator, TransformerMixin):
                 X[f"{self.name_col}"].iloc[0],
             )
         X[self.y] = X[f"{self.y}_norm"].map(self.norm2code).fillna(-1)
+
+        X[f"pred_{self.name_col}"] = (
+            X[f"pred_{self.name_col}"].map(self.norm2name).fillna(-1)
+        )
+
         return X
 
     # def _get_decoded_field(self, norm_value):
@@ -177,15 +197,14 @@ def check_fields(
     df: pd.DataFrame,
     columns_to_check: list[str],
 ):
-    # Создаем пустую маску
     mask = pd.Series(False, index=df.index)
 
     for col in columns_to_check:
         if col in df.columns:
             col_mask = (
                 df[col].isna()  # NaN
-                | (df[col].astype(str).str.strip() == "")  # пустые строки/пробелы
-                | df[col].isin([0, -1, "0", "-1"])  # невалидные значения
+                | (df[col].astype(str).str.strip() == "")
+                | df[col].isin([0, -1, "0", "-1"])
             )
             mask = mask | col_mask
 
@@ -193,11 +212,8 @@ def check_fields(
         logger.warning(f"Contains empty fields ({mask.sum()}):")
         logger.warning(
             "\n"
-            + df.to_string(
-                index=True,  # Показать индексы
-                max_rows=None,  # Все строки
-                max_cols=None,  # Все колонки
-                line_width=1000,  # Широкая строка
-                show_dimensions=True,  # Показать размеры
+            + df.to_json(
+                orient="records",
+                force_ascii=False,
             )
         )

@@ -369,6 +369,8 @@ class FastTextModel(Model):
                     self.sentence_vector_cached(
                         tuple(s), self.base_name, self.model_type
                     )
+                    if len(s) > 0
+                    else FastTextModel.wv_cached("", self.base_name, self.model_type)
                     for s in chunk
                 ]
             ).astype(np.float32)

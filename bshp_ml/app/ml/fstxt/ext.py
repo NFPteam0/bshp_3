@@ -1,16 +1,15 @@
 import gc
-import pandas as pd
-from sklearn.pipeline import Pipeline
-from ml.data_processing import NanProcessor
-from ml.fstxt.utils import prepare_sentences
-from schemas.models import ExtEmbedPredictionsRow, ModelTypes
 
-from ml.data_processing import Checker
-from .model import BATCH_SIZE, FastTextModel
-from .model import logger
+import pandas as pd
+from ml.data_processing import Checker, NanProcessor
+from schemas.models import ExtEmbedPredictionsRow, ModelTypes
 from settings import (
     USE_DETAILED_LOG,
 )
+from sklearn.pipeline import Pipeline
+
+from .model import BATCH_SIZE, FastTextModel, logger
+from .utils import build_class_vocab, prepare_sentences_weighted
 
 
 class ExtFastTextModel(FastTextModel):
@@ -122,26 +121,45 @@ class ExtFastTextModel(FastTextModel):
             "article_kind",
         ]
 
+        ARTICLE_COLUMNS = [
+            "article_name",
+            "analytic",
+            "analytic2",
+            "analytic3",
+            "article_parent",
+            "article_group",
+            "article_kind",
+        ]
+        PP_COLUMNS = ["payment_purpose", "payment_purpose_returned"]
+
         # 3. Preprocess sentences
-        sentences = prepare_sentences(
-            X,
-            [
-                col
-                for col in self.str_columns
-                if col not in UNFEATURED + ["payment_purpose"]
-                and col not in self.y_columns
-            ],
-        )
+        # sentences = prepare_sentences(
+        #     X,
+        #     ARTICLE_COLUMNS,
+        # )
 
-        sentences_pp = prepare_sentences(
-            X,
-            [
-                col
-                for col in self.str_columns
-                if col not in PP_UNFEATURED and col not in self.y_columns
-            ],
-        )
+        # sentences_pp = prepare_sentences(
+        #     X,
+        #     PP_COLUMNS,
+        # )
+        class_vocab = build_class_vocab(self.all_classes_names)
 
+        sentences = prepare_sentences_weighted(
+            X,
+            article_cols=ARTICLE_COLUMNS,
+            payment_cols=PP_COLUMNS,
+            class_vocab=class_vocab,
+            payment_weight=2,
+        )
+        # sentences_pp: payment-only path, same filtering, higher weight
+        # since article context is absent here, weight can be 1 (no repetition needed)
+        sentences_pp = prepare_sentences_weighted(
+            X,
+            article_cols=[],
+            payment_cols=PP_COLUMNS,
+            class_vocab=class_vocab,
+            payment_weight=1,
+        )
         # 4. Predict
 
         for y in self.y_columns:
@@ -162,6 +180,18 @@ class ExtFastTextModel(FastTextModel):
 
             X[f"pred_pp_{y}"] = preds_pp
             X[f"prob_pp_{y}"] = probs_pp
+
+            # голосование с плеч кэтбуста
+            __pp_mask = X[f"prob_pp_{y}"] > X[f"prob_{y}"]
+
+            X.loc[__pp_mask, f"pred_{y}"] = X.loc[__pp_mask, f"pred_pp_{y}"]
+            X.loc[__pp_mask, f"prob_{y}"] = X.loc[__pp_mask, f"prob_pp_{y}"]
+
+            X.loc[X[f"prob_{y}"] > 0.85, f"prob_{y}"] = 1.0
+
+            # THRES = 0.6
+            # X.loc[X[f"prob_{y}"] < THRES, f"pred_{y}"] = ""
+            # X.loc[X[f"prob_{y}"] < THRES, f"prob_{y}"] = 0
 
             gc.collect()
 

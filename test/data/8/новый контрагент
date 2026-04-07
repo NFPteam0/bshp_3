@@ -1,0 +1,94 @@
+[
+{
+
+"number": "000022165",
+
+"date": "01.03.2025 12:00:06",
+
+"is_reverse": "false",
+
+"moving_type": "Доходы",
+
+"base_document_number": "1",
+
+"base_document_date": "25.03.2026 8:56:09",
+
+"base_document_kind": "ПриходныйКассовыйОрдер",
+
+"base_document_operation_type": "Оплата от покупателя",
+
+"company_inn": "",
+
+"company_kpp": "",
+
+"kind": "ПриходныйКассовыйОрдер",
+
+"contractor_kind": "ЮридическоеЛицо",
+
+"contractor_name": "ООО 123",
+
+"contractor_inn": "",
+
+"contractor_kpp": "",
+
+"contract_name": "1",
+
+"contract_number": "",
+
+"article_document_number": "",
+
+"article_document_date": "",
+
+"article_document_found": "",
+
+"article_name": "",
+
+"article_code": "",
+
+"is_main_asset": "false",
+
+"analytic": "",
+
+"analytic2": "",
+
+"analytic3": "",
+
+"article_parent": "",
+
+"article_group": "",
+
+"article_kind": "",
+
+"store": "",
+
+"department": "",
+
+"company_account_number": "",
+
+"contractor_account_number": "",
+
+"row_number": 1,
+
+"qty": 1,
+
+"price": 1000,
+
+"sum": 1000,
+
+"article_row_number": 1,
+
+"cash_flow_item_code": "",
+
+"year": "",
+
+"cash_flow_details_code": "",
+
+"cash_flow_item_name": "",
+
+"cash_flow_details_name": "",
+
+"payment_purpose": "Озимый ячмень 2025 год",
+
+"payment_purpose_returned": ""
+
+}]

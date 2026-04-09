@@ -1,0 +1,38 @@
+version: "3"
+
+services:
+  app:
+    container_name: bshp_v3_stage
+    image: dark_h14/bshp_v3:prod
+    environment:
+      - DB_HOST=db
+      - DB_PORT=27017
+      - TEST_MODE=true
+      - DB_URL=mongodb://db:27017
+      - DATASET_BATCH_LENGTH=200000
+      - QUANTIZE=true        
+    build:
+        context: .
+        dockerfile: bshp_ml/Dockerfile.prod  
+    ports:
+      - "8062:8061"
+    volumes:
+      - ./models_stage:/models
+    networks:
+      - custom
+    depends_on:
+      - db
+    restart: unless-stopped      
+  db:
+    image: mongo:6.0.21
+    container_name: bshp_db_stage
+    ports:
+      - "27217:27017"
+    volumes:
+      - ./db/data_stage:/data/db
+    networks:
+      - custom
+
+networks:
+  custom:
+    driver: bridge

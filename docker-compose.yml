@@ -23,6 +23,7 @@ services:
     volumes:
       - ./bshp_ml/app:/app
       - ./models:/models
+      - ./metrics:/metrics
     networks:
       - custom
     depends_on:

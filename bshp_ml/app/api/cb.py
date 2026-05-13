@@ -1,34 +1,31 @@
+import json
 import logging
 import traceback
-from typing import Optional
 import uuid
+from typing import Optional
+
+import pandas as pd
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Body,
     Depends,
-    HTTPException,
     Header,
+    HTTPException,
     Query,
 )
-import pandas as pd
-from ml.models import Model
-from schemas.models import DataRow, ExtDataRow, ModelTypes, EmbedPredictionsRow
-from schemas.tasks import TaskResponse
 from fastapi.encoders import jsonable_encoder
-import json
-
-from tasks.processing import (
-    process_fitting_model,
-    process_uploading_task,
-    process_fitting_model_v2,
-)
-from tasks.__init__ import task_manager, Reader
 from ml.models import ModelManager, get_model_manager
+from schemas.models import ExtDataRow, ModelTypes
+from schemas.tasks import TaskResponse
 from settings import (
     USE_DETAILED_LOG,
 )
-
+from tasks.__init__ import Reader, task_manager
+from tasks.processing import (
+    process_fitting_model,
+    process_fitting_model_v2,
+)
 
 logger = logging.getLogger(__name__)
 # router = APIRouter(prefix="/v2", tags=["Новая cb"])

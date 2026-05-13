@@ -19,7 +19,7 @@ services:
     volumes:
       - ./models_stage:/models
     networks:
-      - custom
+      - stg_custom
     depends_on:
       - db
     restart: unless-stopped      
@@ -31,7 +31,7 @@ services:
     volumes:
       - ./db/data_stage:/data/db
     networks:
-      - custom
+      - stg_custom
 
 networks:
   custom:

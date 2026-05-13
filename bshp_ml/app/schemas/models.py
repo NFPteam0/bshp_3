@@ -1,9 +1,8 @@
-import pandas as pd
-from pydantic import BaseModel, field_validator
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from typing import Dict, Optional
 
-from typing import Optional, Dict
+from pydantic import BaseModel, field_validator
 
 
 class DataRow(BaseModel):
@@ -143,3 +142,4 @@ class ModelTypes(str, Enum):
     fstxt = "fasttext"
     extfstxt = "extfasttext"
     catboost_txt = "catboost+"
+    transformer = "transformer"

@@ -140,7 +140,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         elapsed = (time_end - time_start).total_seconds()
         metrics = MetricsTrain(
             model_name=self.model_type.value,
-            dataset_name=self.metrics_dataset_name or "",
+            dataset_name=self.base_name,
             accuracy_year=self.field_accuracies.get("year", 0.0),
             accuracy_item=self.field_accuracies.get("cash_flow_item_code", 0.0),
             accuracy_details=self.field_accuracies.get("cash_flow_details_code", 0.0),
@@ -461,7 +461,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     logger.info("Total len of classes data: %s", len(all_data))
                     logger.info(f"X columns: {df_i.columns}, shape: {df_i.shape}")
                 if len(all_data) == 1:
-                    self.field_accuracies[y] = 1.0
+                    self.field_accuracies[y] = [1.0]
                     # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                     this_label = all_data[f"{y}_norm"].iloc[0]
                     bscores.extend([1 for _ in range(len(df_i[f"{y}_norm"]))])

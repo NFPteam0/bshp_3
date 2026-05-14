@@ -5,13 +5,13 @@ import logging
 import os
 import pickle
 import shutil
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from catboost import Pool
 from ml.cb.classifier import (
     CatBoostClassifier,
-    Pool,
     sum_models,
 )
 from ml.data_processing import (
@@ -19,6 +19,7 @@ from ml.data_processing import (
     FeatureAdder,
     NanProcessor,
 )
+from ml.metrics import MetricsTrain, write_in_csv
 from schemas.models import ModelStatuses, ModelTypes
 from settings import (
     DEVICES,
@@ -128,6 +129,28 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "categorical": self.categorical,
             "date_columns": self.date_columns,
         }
+        self.field_accuracies: dict[str, float] = {}
+
+    def _fill_metrics(
+        self,
+        data_size: int,
+        time_start: "datetime",
+        time_end: "datetime",
+    ) -> MetricsTrain:
+        elapsed = (time_end - time_start).total_seconds()
+        metrics = MetricsTrain(
+            model_name=self.model_type.value,
+            dataset_name=self.metrics_dataset_name or "",
+            accuracy_year=self.field_accuracies.get("year", 0.0),
+            accuracy_item=self.field_accuracies.get("cash_flow_item_code", 0.0),
+            accuracy_details=self.field_accuracies.get("cash_flow_details_code", 0.0),
+            time=elapsed,
+            time_start=time_start.isoformat(),
+            time_end=time_end.isoformat(),
+            data_size=data_size,
+        )
+        write_in_csv(metrics)
+        return metrics
 
     def train(
         self,
@@ -322,7 +345,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                             cat_features=cat_idxs,
                         )
                         best_model = current_model_test
-        return best_model
+        return best_model, best_score
 
     def train_on_field(
         self, df: pd.DataFrame, y: str, to_drop: list[str], parameters: dict
@@ -438,6 +461,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     logger.info("Total len of classes data: %s", len(all_data))
                     logger.info(f"X columns: {df_i.columns}, shape: {df_i.shape}")
                 if len(all_data) == 1:
+                    self.field_accuracies[y] = 1.0
                     # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                     this_label = all_data[f"{y}_norm"].iloc[0]
                     bscores.extend([1 for _ in range(len(df_i[f"{y}_norm"]))])
@@ -491,7 +515,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     all_data=all_data,
                     y=f"{y}_norm",
                 )
-                model_i = self.gridsearch(
+                model_i, acc_i = self.gridsearch(
                     all_classes=all_classes,
                     df_train=df_train,
                     df_test=df_test,
@@ -505,6 +529,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     _df_latest=_df_latest_i,
                 )
                 self.field_models[y][int(item)] = model_i
+                self.field_accuracies.setdefault(y, []).append(acc_i)
 
                 # TODO: если fsttxt model справляется лучше?
                 if False:
@@ -521,6 +546,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         self._save_cb_model(model_i, column=y, item=int(item))
                         ...
                 self._save_cb_model(model_i, column=y, item=int(item))
+            # AVG for details
+            if isinstance(self.field_accuracies.get(y), list):
+                self.field_accuracies[y] = (
+                    float(sum(self.field_accuracies[y]) / len(self.field_accuracies[y]))
+                    if self.field_accuracies[y]
+                    else 0.0
+                )
 
         else:
             if USE_DETAILED_LOG:
@@ -558,6 +590,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 logger.info(f"X columns: {df.columns}, shape: {df.shape}")
 
             if len(all_data) == 1:
+                self.field_accuracies[y] = 1.0
                 # TODO: get rid of this, save encoder to .pkl
                 # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                 this_label = all_data[f"{y}_norm"].iloc[0]
@@ -602,7 +635,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 ],
                 all_data=all_data,
             )
-            model_i = self.gridsearch(
+            model_i, acc_i = self.gridsearch(
                 all_classes=all_classes,
                 df_train=df_train,
                 df_test=df_test,
@@ -616,6 +649,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 _df_latest=_df_latest,
             )
             self.field_models[y] = model_i
+            self.field_accuracies[y] = float(acc_i)
             self._save_cb_model(model_i, y)
 
     async def _fit(self, df: pd.DataFrame, parameters: dict, is_first=True):
@@ -623,8 +657,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
     def __sync_fit(self, df: pd.DataFrame, parameters: dict, is_first=True):
         is_first = True  # TODO: ?
+        self.field_accuracies = {}
+        time_start = datetime.utcnow()
         if USE_DETAILED_LOG:
             logger.info("{} fit".format("First" if is_first else "continuous"))
+            logger.info(f"Starting time: {time_start}, Shape: {df.shape}")
 
         for y in self.y_columns:
             self.strict_acc[y] = {}
@@ -634,8 +671,15 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 df=df, y=y, to_drop=self.y_columns, parameters=parameters
             )
             gc.collect()
-            # self._save_cb_model(model, column=y, item=item)
-            # self._load_all_models()
+
+        time_end = datetime.utcnow()
+        self._fill_metrics(
+            data_size=len(df),
+            time_start=time_start,
+            time_end=time_end,
+        )
+        # self._save_cb_model(model, column=y, item=item)
+        # self._load_all_models()
         # self._load_all_models()
 
     async def fit(self, Xy_api: dict, parameters):

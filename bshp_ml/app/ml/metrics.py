@@ -54,7 +54,11 @@ def write_in_csv(metrics: MetricsTrain) -> None:
             # Write metrics row
             writer.writerow(metrics.model_dump())
             logger.info(
-                f"Metrics saved to CSV: {metrics.model_name} - Accuracy: {metrics.accuracy:.4f}"
+                f"Metrics saved to CSV: {metrics.model_name} | "
+                f"year={metrics.accuracy_year:.4f} "
+                f"item={metrics.accuracy_item:.4f} "
+                f"details={metrics.accuracy_details:.4f} "
+                f"time={metrics.time:.1f}s rows={metrics.data_size}"
             )
 
     except Exception as e:

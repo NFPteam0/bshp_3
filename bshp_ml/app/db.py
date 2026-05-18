@@ -1,10 +1,12 @@
-from motor.motor_asyncio import AsyncIOMotorClient
-from typing import Optional, Any
-from pymongo.errors import ServerSelectionTimeoutError
 import logging
+from typing import Any, Optional
 
+from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import ServerSelectionTimeoutError
 
 logger = logging.getLogger(__name__)
+
+MAX_DOCUMENTS_READ = 80_000
 
 
 class DBProcessor:
@@ -96,6 +98,47 @@ class DBProcessor:
             result = await collection.find(
                 c_filter, projection={"_id": False}
             ).to_list()
+
+        return result
+
+    async def find_limited(
+        self,
+        collection_name: str,
+        db_filter=None,
+        limit: int = MAX_DOCUMENTS_READ,
+        batch_size: int = 0,
+    ) -> list[dict]:
+        """
+        Safe version of find() with hard limit on amount of loaded documents.
+
+        Prevents accidental huge reads into memory / pandas.
+        """
+
+        if limit > MAX_DOCUMENTS_READ:
+            raise ValueError(f"limit cannot exceed {MAX_DOCUMENTS_READ}")
+
+        collection = self._get_collection(collection_name)
+
+        c_filter = db_filter if db_filter and db_filter.get("base_name") else {}
+
+        cursor = collection.find(
+            c_filter,
+            projection={"_id": False},
+            batch_size=batch_size,
+        ).limit(limit)
+
+        result = []
+
+        async for doc in cursor:
+            result.append(doc)
+
+        await cursor.close()
+
+        logger.info(
+            "find_limited loaded %s documents from %s",
+            len(result),
+            collection_name,
+        )
 
         return result
 

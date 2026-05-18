@@ -353,14 +353,17 @@ class Model(ABC):
         self.fitting_end_date = datetime.now(UTC)
         logger.info("Fitting. Done")
 
-    async def _read_dataset(self, parameters) -> pd.DataFrame:
+    async def _read_dataset(self, parameters, limited=False) -> pd.DataFrame:
         from tasks.__init__ import Reader
 
         data_filter = parameters["data_filter"]
         if USE_DETAILED_LOG:
             logger.info("Reading data from db")
         reader = Reader()
-        X_y = await reader.read(data_filter)
+        if limited:
+            X_y = await reader.read_limited(data_filter)
+        else:
+            X_y = await reader.read(data_filter)
 
         return X_y
 

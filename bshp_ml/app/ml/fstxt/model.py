@@ -69,7 +69,8 @@ class FastTextModel(Model):
                         "data_filter": {}
                         # if self.base_name != "all_bases"
                         # else None
-                    }
+                    },
+                    limited=True,
                 )
                 self.all_classes_names = {
                     col: df[col].unique() for col in self.y_columns

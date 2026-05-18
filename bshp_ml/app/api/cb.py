@@ -1,34 +1,31 @@
+import json
 import logging
 import traceback
-from typing import Optional
 import uuid
+from typing import Optional
+
+import pandas as pd
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Body,
     Depends,
-    HTTPException,
     Header,
+    HTTPException,
     Query,
 )
-import pandas as pd
-from ml.models import Model
-from schemas.models import DataRow, ExtDataRow, ModelTypes, EmbedPredictionsRow
-from schemas.tasks import TaskResponse
 from fastapi.encoders import jsonable_encoder
-import json
-
-from tasks.processing import (
-    process_fitting_model,
-    process_uploading_task,
-    process_fitting_model_v2,
-)
-from tasks.__init__ import task_manager, Reader
 from ml.models import ModelManager, get_model_manager
+from schemas.models import ExtDataRow, ModelTypes
+from schemas.tasks import TaskResponse
 from settings import (
     USE_DETAILED_LOG,
 )
-
+from tasks.__init__ import Reader, task_manager
+from tasks.processing import (
+    process_fitting_model,
+    process_fitting_model_v2,
+)
 
 logger = logging.getLogger(__name__)
 # router = APIRouter(prefix="/v2", tags=["Новая cb"])
@@ -104,7 +101,7 @@ async def fit(
             status_code=404, detail=f"No data. Save the data from 1C. Detail: {str(e)}"
         )
     try:
-        fsttext = model_manager.get_model(ModelTypes.extfstxt, "all_bases")
+        fsttext = await model_manager.get_model(ModelTypes.extfstxt, "all_bases")
         # модель фасттекст для всех баз одна
         Xy_embed = await fsttext.predict(X_y, set_classes=True)
         Xy_json = json.loads(Xy_embed)
@@ -143,6 +140,8 @@ async def fit(
 
         await task_manager.update_task(task_id, status="ERROR", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        model_manager.unload_model(model_type, base_name)
 
 
 @router.post("/predict")
@@ -170,7 +169,7 @@ async def predict(
         )
         raise HTTPException(status_code=404, detail=str(e))
     try:
-        fsttext = model_manager.get_model(ModelTypes.extfstxt, "all_bases")
+        fsttext = await model_manager.get_model(ModelTypes.extfstxt, "all_bases")
         Xy_embed = await fsttext.predict(
             jsonable_encoder(X), set_classes=True, set_from=dataset
         )
@@ -182,7 +181,7 @@ async def predict(
     logger.info("Shape of json for predictions: %s", str(pd.DataFrame(Xy_json).shape))
     model_type = ModelTypes.catboost_txt
     try:
-        model = model_manager.get_model(model_type, base_name)
+        model = await model_manager.get_model(model_type, base_name)
         result = []
         X_y_list = await model.predict(Xy_json)
         result = X_y_list
@@ -190,6 +189,8 @@ async def predict(
         print(traceback.format_exc())
         logger.error(f"Error predicting: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        model_manager.unload_model(model_type, base_name)
 
     return result
 

@@ -1,8 +1,10 @@
 import logging
 
 from schemas.models import ModelStatuses
+
 from .loader import DataLoader
-from ml.models import ModelManager
+
+from ml.models import ModelManager  # noqa: F401  # isort: skip
 from .manager import TaskManager
 
 logger = logging.getLogger(__name__)
@@ -57,7 +59,7 @@ async def process_fitting_model(
             return
 
         # Execute loading
-        model = model_manager.get_model(task.model_type, task.base_name)
+        model = await model_manager.get_model(task.model_type, task.base_name)
         model_manager.add_model(model)
         if model.status == ModelStatuses.FITTING:
             raise ValueError("Current model is already fitting")
@@ -113,7 +115,7 @@ async def process_fitting_model_v2(
             return
 
         # Execute loading
-        model = model_manager.get_model(task.model_type, task.base_name)
+        model = await model_manager.get_model(task.model_type, task.base_name)
         model_manager.add_model(model)
         if model.status == ModelStatuses.FITTING:
             raise ValueError("Current model is already fitting")

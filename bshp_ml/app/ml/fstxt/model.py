@@ -1,34 +1,24 @@
 import asyncio
-import copy
-from functools import lru_cache
 import gc
-import json
 import logging
-import os
+from functools import lru_cache
 
-from fastapi import HTTPException
-from sklearn.pipeline import Pipeline
-from .utils import prepare_sentences, preprocess_text
 import numpy as np
+import pandas as pd
 from gensim.models import FastText
-from ..models import Model, get_model_manager
 from ml.data_processing import (
     Checker,
-    DataEncoder,
-    FeatureAdder,
     NanProcessor,
-    Shuffler,
 )
 from schemas.models import EmbedPredictionsRow, ModelStatuses, ModelTypes
-import pandas as pd
 from settings import (
     MODEL_FOLDER,
-    THREAD_COUNT,
     USE_DETAILED_LOG,
-    USED_RAM_LIMIT,
-    DATASET_BATCH_LENGTH,
-    QUANTIZE,
 )
+from sklearn.pipeline import Pipeline
+
+from ..models import Model, get_model_manager
+from .utils import prepare_sentences
 
 # prep_sents = [preprocess_text(" ".join(sent)).split() for sent in prepare_sentences(df, txt_cols)]
 
@@ -102,11 +92,12 @@ class FastTextModel(Model):
                     "Classes found: %s",
                     str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
                 )
-            except KeyError as e:
+            except KeyError:
                 # TODO: другой эксцепт
                 logger.warning("No classes for embeddings detected: {e}")
 
             self._load_pretrained()
+        self.is_loaded = True
 
     def _load_pretrained(self, model_folder=MODEL_FOLDER):
         # NOTE: у fasttext есть ивенты из коробки
@@ -323,7 +314,7 @@ class FastTextModel(Model):
     @lru_cache(maxsize=20_000)
     def wv_cached(word: str, base_name: str, model_type: str):
         model_manager = get_model_manager()
-        model = model_manager.get_model(model_type, base_name, log=False)
+        model = model_manager._sync_get_model(model_type, base_name, log=False)
         return model._model.wv[word]
 
     @staticmethod

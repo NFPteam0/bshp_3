@@ -1,15 +1,14 @@
 import asyncio
 import logging
-import os
 import traceback
 import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
 import aiohttp
+import pandas as pd
 from cachetools import TTLCache
 from fastapi import (
-    APIRouter,
     BackgroundTasks,
     Body,
     Depends,
@@ -17,19 +16,16 @@ from fastapi import (
     File,
     Header,
     HTTPException,
-    Path,
     Query,
     UploadFile,
 )
 from fastapi.exceptions import HTTPException
 from fastapi.responses import HTMLResponse  # FileResponse
-
-from tasks.__init__ import data_loader
-from ml import ModelManager, init_manager as init_model_manager, get_model_manager
+from ml import ModelManager, get_model_manager
+from ml import init_manager as init_model_manager
 from schemas.models import (
     DataRow,
     ModelInfo,
-    ModelStatuses,
     ModelTypes,
 )
 from schemas.tasks import (
@@ -37,10 +33,11 @@ from schemas.tasks import (
     TaskResponse,
 )
 from settings import AUTH_SERVICE_URL, DB_URL, TEST_MODE, VERSION
-from tasks.processing import process_fitting_model, process_uploading_task
-from db import db_processor
 from tasks import task_manager
-import pandas as pd
+from tasks.__init__ import data_loader
+from tasks.processing import process_fitting_model, process_uploading_task
+
+from db import db_processor
 
 pd.set_option("future.no_silent_downcasting", True)
 
@@ -94,7 +91,7 @@ async def check_token(token: str = Header()) -> bool:
         logger.warning(f"Auth service connection error: {str(e)}")
         raise HTTPException(status_code=503, detail="Authorization service unavailable")
 
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error in check_token")
         raise HTTPException(status_code=500, detail="Internal auth error")
 
@@ -258,7 +255,7 @@ async def fit(
     parameters: dict = Body(),
     model_manager=Depends(get_model_manager),
 ) -> TaskResponse:
-    logger.info(f"Start fitting model")
+    logger.info("Start fitting model")
 
     task_id = str(uuid.uuid4())
     task = await task_manager.create_task(task_id)
@@ -344,7 +341,7 @@ async def predict(
         X_list = []
         for row in X:
             X_list.append(row.model_dump())
-        model = model_manager.get_model(model_type, base_name, log=False)
+        model = await model_manager.get_model(model_type, base_name, log=False)
         result = []
         X_y_list = await model.predict(X_list)
         for row in X_y_list:
@@ -368,7 +365,7 @@ async def get_task_status(
     return status
 
 
-from api import embed_router, cb_router
+from api import cb_router, embed_router
 
 app.include_router(embed_router)
 app.include_router(cb_router)

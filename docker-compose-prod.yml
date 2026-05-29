@@ -33,6 +33,7 @@ services:
       - ./db/data:/data/db
     networks:
       - custom
+    restart: unless-stopped
 
 networks:
   custom:

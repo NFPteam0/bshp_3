@@ -9,7 +9,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from catboost import Pool
+from catboost import CatboostError, Pool
 from ml.cb.classifier import (
     CatBoostClassifier,
     sum_models,
@@ -182,7 +182,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             if USE_DETAILED_LOG:
                 logger.info(f"BATCH {n + 1} of total {len(df_train) // BSIZE + 1}")
             if model is None:
-                model = CatBoostClassifier(**params)
+                model = CatBoostClassifier(**params, allow_const_label=True)
                 batch.set_baseline(np.zeros(shape=(batch.num_row(), len(all_data))))
                 test_pool.set_baseline(
                     np.zeros(shape=(test_pool.num_row(), len(all_data)))
@@ -190,7 +190,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                 model.fit(X=batch, eval_set=test_pool)
             else:
-                model_new = CatBoostClassifier(**params)
+                model_new = CatBoostClassifier(**params, allow_const_label=True)
                 base = model.predict(batch, prediction_type="RawFormulaVal")
                 base[np.isneginf(base)] = -1
                 batch.set_baseline(base)
@@ -337,7 +337,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         _params = params.copy()
                         _params["use_best_model"] = False
 
-                        current_model_test = CatBoostClassifier(**_params)
+                        current_model_test = CatBoostClassifier(
+                            **_params, allow_const_label=True
+                        )
                         current_model_test = current_model_test.fit(
                             X=final_batch.drop(y, axis=1),
                             y=final_batch[y],
@@ -454,6 +456,20 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                 df_i.drop(to_drop, inplace=True, axis=1)
 
+                # Guard: constant features — no model can learn, use majority class
+                _feature_cols = [c for c in df_i.columns if c != f"{y}_norm"]
+                if not _feature_cols or df_i[_feature_cols].nunique().max() <= 1:
+                    this_label = df_i[f"{y}_norm"].mode().iloc[0]
+                    if USE_DETAILED_LOG:
+                        logger.warning(
+                            "Item %s has constant features after column drop — using majority label %s",
+                            item,
+                            this_label,
+                        )
+                    self.field_accuracies.setdefault(y, []).append(0.0)
+                    self.strict_acc[y][int(item)] = this_label
+                    continue
+
                 all_data = make_all_data(df_i, f"{y}_norm")
                 all_classes = all_data[f"{y}_norm"].unique()
 
@@ -461,11 +477,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     logger.info("Total len of classes data: %s", len(all_data))
                     logger.info(f"X columns: {df_i.columns}, shape: {df_i.shape}")
                 if len(all_data) == 1:
-                    self.field_accuracies[y] = [1.0]
+                    self.field_accuracies.setdefault(y, []).append(1.0)
                     # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                     this_label = all_data[f"{y}_norm"].iloc[0]
                     bscores.extend([1 for _ in range(len(df_i[f"{y}_norm"]))])
-                    logger.info("Only one details code, no need for model")
+                    if USE_DETAILED_LOG:
+                        logger.info("Only one details code, no need for model")
                     # TODO: сохранить словарь
                     self.strict_acc[y][int(item)] = this_label
                     continue
@@ -515,21 +532,26 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     all_data=all_data,
                     y=f"{y}_norm",
                 )
-                model_i, acc_i = self.gridsearch(
-                    all_classes=all_classes,
-                    df_train=df_train,
-                    df_test=df_test,
-                    cat_idxs=cat_idxs,
-                    test_pool=test_pool,
-                    y=f"{y}_norm",
-                    to_drop=[],
-                    lr=parameters.get("lr", 0.01),
-                    trees=parameters.get("trees", 30),
-                    all_data=all_data,
-                    _df_latest=_df_latest_i,
-                )
-                self.field_models[y][int(item)] = model_i
-                self.field_accuracies.setdefault(y, []).append(acc_i)
+                try:
+                    model_i, acc_i = self.gridsearch(
+                        all_classes=all_classes,
+                        df_train=df_train,
+                        df_test=df_test,
+                        cat_idxs=cat_idxs,
+                        test_pool=test_pool,
+                        y=f"{y}_norm",
+                        to_drop=[],
+                        lr=parameters.get("lr", 0.01),
+                        trees=parameters.get("trees", 30),
+                        all_data=all_data,
+                        _df_latest=_df_latest_i,
+                    )
+                    self.field_models[y][int(item)] = model_i
+                    self.field_accuracies.setdefault(y, []).append(acc_i)
+                except CatboostError as e:
+                    logger.error(f"Error while training model for item {item}: {e}")
+                    self.field_accuracies.setdefault(y, []).append(0.0)
+                    raise e
 
                 # TODO: если fsttxt model справляется лучше?
                 if False:
@@ -579,6 +601,19 @@ class CatBoostModelEmbeddings(CatBoostModel):
             )
             df.drop(to_drop, axis=1, inplace=True)
 
+            _feature_cols = [c for c in df.columns if c != f"{y}_norm"]
+            if not _feature_cols or df[_feature_cols].nunique().max() <= 1:
+                this_label = df[f"{y}_norm"].mode().iloc[0]
+                if USE_DETAILED_LOG:
+                    logger.warning(
+                        "Field %s has constant features after column drop — using majority label %s",
+                        y,
+                        this_label,
+                    )
+                self.field_accuracies[y] = 0.0
+                self.strict_acc[y] = this_label
+                return
+
             all_data = make_all_data(df, f"{y}_norm")
             all_classes = all_data[f"{y}_norm"].unique()
             if USE_DETAILED_LOG:
@@ -590,7 +625,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 logger.info(f"X columns: {df.columns}, shape: {df.shape}")
 
             if len(all_data) == 1:
-                self.field_accuracies[y] = 1.0
+                self.field_accuracies.setdefault(y, []).append(1.0)
                 # TODO: get rid of this, save encoder to .pkl
                 # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                 this_label = all_data[f"{y}_norm"].iloc[0]
@@ -1030,6 +1065,15 @@ class CatBoostModelEmbeddings(CatBoostModel):
             X_batch = Xy.drop([y for y in self.y_columns if y in Xy.columns], axis=1)
             # TODO: columns to upper layer
             X_batch = Xy.drop(columns=set(to_drop) | {y}, axis=1)
+            # if X_batch has constant columns (all same)
+            if X_batch.nunique().max() == 1:
+                if USE_DETAILED_LOG:
+                    logger.warning(
+                        "Batch has constant columns for field: %s, Values: %s",
+                        y,
+                        y_batch,
+                    )
+                y_batch[:] = y_batch.iloc[0]
             pool = Pool(
                 X_batch,
                 label=y_batch,

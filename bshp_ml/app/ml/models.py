@@ -20,7 +20,7 @@ from ml.data_processing import (
     NanProcessor,
     Shuffler,
 )
-from schemas.models import ModelStatuses, ModelTypes
+from schemas.models import ModelInfo, ModelStatuses, ModelTypes
 from settings import (
     MODEL_FOLDER,
     USE_DETAILED_LOG,
@@ -504,7 +504,6 @@ class Model(ABC):
         """Load parameters only — no model weights. Fast, low-memory startup."""
         self.uid = uid
         self._load_parameters()
-        self.is_loaded = False
         if USE_DETAILED_LOG:
             logger.info("Loaded metadata for %s %s", self.model_type, self.base_name)
 
@@ -787,7 +786,7 @@ class ModelManager:
         if c_models:
             model = c_models[0]
         else:
-            model = self.get_model(model_type, base_name)
+            model = await self.get_model(model_type, base_name)
 
         self.models = [
             el
@@ -803,7 +802,16 @@ class ModelManager:
             shutil.rmtree(model_dir)
 
     async def get_info(self, model_type=ModelTypes.rf, base_name=""):
-        model = self.get_model(model_type=model_type, base_name=base_name, log=False)
+        model_list = [
+            el
+            for el in self.models
+            if el["model_type"] == model_type and el["base_name"] == base_name
+        ]
+        if model_list:
+            model = model_list[-1]["model"]
+        else:
+            # Not registered at all — return empty defaults
+            return ModelInfo(status=ModelStatuses.ERROR, error_text="Model not found")
 
         return {
             "status": model.status,

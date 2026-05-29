@@ -1,9 +1,8 @@
-import pandas as pd
-from pydantic import BaseModel, field_validator
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from typing import Dict, Optional
 
-from typing import Optional, Dict
+from pydantic import BaseModel, field_validator
 
 
 class DataRow(BaseModel):
@@ -132,9 +131,9 @@ class ModelStatuses(Enum):
 class ModelInfo(BaseModel):
     status: ModelStatuses
     error_text: str
-    fitting_start_date: Optional[datetime]
-    fitting_end_date: Optional[datetime]
-    metrics: Optional[Dict[str, float]]
+    fitting_start_date: Optional[datetime] = None
+    fitting_end_date: Optional[datetime] = None
+    metrics: Optional[Dict[str, float]] = None
 
 
 class ModelTypes(str, Enum):

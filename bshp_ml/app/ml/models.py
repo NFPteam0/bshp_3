@@ -21,10 +21,7 @@ from ml.data_processing import (
     Shuffler,
 )
 from schemas.models import ModelInfo, ModelStatuses, ModelTypes
-from settings import (
-    MODEL_FOLDER,
-    USE_DETAILED_LOG,
-)
+from settings import MODEL_FOLDER, USE_DETAILED_LOG, settings
 from sklearn.pipeline import Pipeline
 
 from db import db_processor
@@ -609,6 +606,9 @@ class Model(ABC):
 class ModelManager:
     def __init__(self):
         self.models = []
+        self.max_models = (
+            settings.MAX_MODELS
+        )  # max models for training at the same time
 
     async def read_models(self):
         models = []

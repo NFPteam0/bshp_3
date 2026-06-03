@@ -56,12 +56,19 @@ class ExtFastTextModel(FastTextModel):
         else:
             set_from = X
         if set_classes:
+            # work on a copy so we don't mutate the caller's dataframe
+            set_from = set_from.copy()
             set_from["cash_flow_item_name"] = set_from["cash_flow_item_name"].astype(
                 str
             ) + set_from["cash_flow_item_code"].astype(int).astype(str)
             set_from["cash_flow_details_name"] = set_from[
                 "cash_flow_details_name"
             ].astype(str) + set_from["cash_flow_details_code"].astype(int).astype(str)
+            self.name2code = {
+                "cash_flow_item_name": "cash_flow_item_code",
+                "cash_flow_details_name": "cash_flow_details_code",
+                "year": "year",
+            }
             self.all_classes_names = {
                 col: set_from[col].unique() for col in self.y_columns
             }
@@ -70,17 +77,13 @@ class ExtFastTextModel(FastTextModel):
                     "Classes found: %s",
                     str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
                 )
-            self.name2code = {
-                "cash_flow_item_name": "cash_flow_item_code",
-                "cash_flow_details_name": "cash_flow_details_code",
-                "year": "year",
-            }
             self.all_classes_codes = {
                 col: dict(
-                    zip(
-                        set_from[col].unique(),
-                        set_from[self.name2code[col]].replace("", -1).astype(int),
-                    )
+                    set_from.groupby(col)[self.name2code[col]]
+                    .first()
+                    .replace("", -1)
+                    .fillna(-1)
+                    .astype(int)
                 )
                 for col in self.y_columns
             }
@@ -95,6 +98,10 @@ class ExtFastTextModel(FastTextModel):
                         )
         if self.all_classes_names is None or self.all_classes_codes is None:
             raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
+
+        # snapshot to avoid concurrent overwrite between class assignment and build_class_matrix
+        local_classes_names = self.all_classes_names
+        local_classes_codes = self.all_classes_codes
 
         # details cols
         UNFEATURED = [
@@ -142,7 +149,7 @@ class ExtFastTextModel(FastTextModel):
         #     X,
         #     PP_COLUMNS,
         # )
-        class_vocab = build_class_vocab(self.all_classes_names)
+        class_vocab = build_class_vocab(local_classes_names)
 
         sentences = prepare_sentences_weighted(
             X,
@@ -164,7 +171,7 @@ class ExtFastTextModel(FastTextModel):
 
         for y in self.y_columns:
             class_matrix, class_names = self.build_class_matrix(
-                self.all_classes_names[y], self.all_classes_codes[y]
+                local_classes_names[y], local_classes_codes[y]
             )
 
             preds, probs = self.batched_predict(

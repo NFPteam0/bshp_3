@@ -1,29 +1,21 @@
 import logging
-import asyncio
-import zipfile
-import os
+from datetime import datetime
+
 import pandas as pd
-import json
-from datetime import datetime, timezone
-from pydantic import TypeAdapter, ValidationError
+
+# from db import db_processor
+from ml.utils import periodic_dates
+
+# import asyncio
+# import uuid
+# from tasks import task_manager
+from settings import USE_DETAILED_LOG
 
 # from pydantic_core import InitErrorDetails
 # from typing import List
 # from collections import defaultdict
 # from .cb.utils import get_y_map
-
 from sklearn.base import BaseEstimator, TransformerMixin
-
-# import asyncio
-# import uuid
-import gc
-
-# from tasks import task_manager
-from settings import TEMP_FOLDER, USE_DETAILED_LOG, DB_URL
-from schemas.models import DataRow
-
-# from db import db_processor
-from ml.utils import periodic_dates
 
 logging.getLogger("vbm_data_processing_logger").setLevel(logging.ERROR)
 

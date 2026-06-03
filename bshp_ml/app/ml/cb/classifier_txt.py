@@ -889,7 +889,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         Xy1[f"{y}_norm"] = y_pred.ravel()
 
                         if USE_DETAILED_LOG:
-                            logging.info(f"Feature names: {model.feature_names_}")
+                            logger.info(f"Feature names: {model.feature_names_}")
                             importance = (
                                 pd.DataFrame(
                                     {
@@ -900,7 +900,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                                 .sort_values("imp", ascending=False)
                                 .head()
                             )
-                            logging.info(
+                            logger.info(
                                 f"For {y} most important fields are:\n%s",
                                 importance.to_json,
                             )
@@ -922,7 +922,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     #     year_mask = X_y[ITEM].isin(self.items_wo_year)
                     X = X_y.copy()
                     model = field_models[y]
-                    logging.info("Encoders: %s", list(self.field_encoders.keys()))
+                    if USE_DETAILED_LOG:
+                        logger.info("Encoders: %s", list(self.field_encoders.keys()))
                     encoder = self.field_encoders[y]
                     X = encoder.transform(X)
                     # if "pred_cash_flow_item_name" in X.columns:
@@ -949,7 +950,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         cat_features=cat_idxs,
                     )
                     if USE_DETAILED_LOG:
-                        logging.info(f"Feature names: {model.feature_names_}")
+                        logger.info(f"Feature names: {model.feature_names_}")
                         importance = (
                             pd.DataFrame(
                                 {
@@ -960,7 +961,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                             .sort_values("imp", ascending=False)
                             .head()
                         )
-                        logging.info(
+                        logger.info(
                             f"For {y} most important fields are:\n%s",
                             importance.to_json,
                         )
@@ -974,7 +975,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                     if USE_DETAILED_LOG:
                         _js = json.loads(
-                            X_y.to_json(
+                            X_y.head().to_json(
                                 orient="records",
                                 force_ascii=False,
                             )

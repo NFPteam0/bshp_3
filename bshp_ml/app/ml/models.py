@@ -703,7 +703,7 @@ class ModelManager:
         await model.save()
 
     async def get_model(
-        self, model_type=ModelTypes.rf, base_name="all_bases", log=True
+        self, model_type=ModelTypes.rf, base_name="all_bases", log=True, to_delete=False
     ):
         if log:
             logger.info("Get model with params: %s %s", model_type, base_name)
@@ -718,7 +718,11 @@ class ModelManager:
             model = self._get_new_model(model_type, base_name)  # TODO: ?
             return model
 
-        if not model.is_loaded:
+        if (
+            not model.is_loaded
+            and model.status != ModelStatuses.ERROR
+            and not to_delete
+        ):
             if USE_DETAILED_LOG:
                 logger.info(
                     "Model not in memory, loading from disk: %s %s",
@@ -786,7 +790,7 @@ class ModelManager:
         if c_models:
             model = c_models[0]
         else:
-            model = await self.get_model(model_type, base_name)
+            model = await self.get_model(model_type, base_name, to_delete=True)
 
         self.models = [
             el

@@ -64,22 +64,19 @@ class ExtFastTextModel(FastTextModel):
             set_from["cash_flow_details_name"] = set_from[
                 "cash_flow_details_name"
             ].astype(str) + set_from["cash_flow_details_code"].astype(int).astype(str)
-            self.name2code = {
+            name2code = {
                 "cash_flow_item_name": "cash_flow_item_code",
                 "cash_flow_details_name": "cash_flow_details_code",
                 "year": "year",
             }
-            self.all_classes_names = {
+            # build locally first — local var is bound to this dict before self is updated,
+            # so a concurrent thread overwriting self.all_classes_* can't affect this call
+            local_classes_names = {
                 col: set_from[col].unique() for col in self.y_columns
             }
-            if USE_DETAILED_LOG:
-                logger.info(
-                    "Classes found: %s",
-                    str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
-                )
-            self.all_classes_codes = {
+            local_classes_codes = {
                 col: dict(
-                    set_from.groupby(col)[self.name2code[col]]
+                    set_from.groupby(col)[name2code[col]]
                     .first()
                     .replace("", -1)
                     .fillna(-1)
@@ -87,21 +84,28 @@ class ExtFastTextModel(FastTextModel):
                 )
                 for col in self.y_columns
             }
+            self.name2code = name2code
+            self.all_classes_names = local_classes_names
+            self.all_classes_codes = local_classes_codes
             if USE_DETAILED_LOG:
+                logger.info(
+                    "Classes found: %s",
+                    str({cls: len(lst) for cls, lst in local_classes_names.items()}),
+                )
                 for col in self.y_columns:
-                    empty = set_from[self.name2code[col]].isna() | (
-                        set_from[self.name2code[col]].astype(str).str.strip() == ""
+                    empty = set_from[name2code[col]].isna() | (
+                        set_from[name2code[col]].astype(str).str.strip() == ""
                     )
                     if empty.any():
                         logger.warning(
-                            f"Empty {self.name2code[col]} at number={set_from.loc[empty.idxmax(), 'number']}"
+                            f"Empty {name2code[col]} at number={set_from.loc[empty.idxmax(), 'number']}"
                         )
-        if self.all_classes_names is None or self.all_classes_codes is None:
-            raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
+        else:
+            local_classes_names = self.all_classes_names
+            local_classes_codes = self.all_classes_codes
 
-        # snapshot to avoid concurrent overwrite between class assignment and build_class_matrix
-        local_classes_names = self.all_classes_names
-        local_classes_codes = self.all_classes_codes
+        if local_classes_names is None or local_classes_codes is None:
+            raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 
         # details cols
         UNFEATURED = [

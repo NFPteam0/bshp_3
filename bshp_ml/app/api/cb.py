@@ -56,7 +56,10 @@ async def fit(
     parameters["calculate_metrics"] = (
         False  # forced, breaks otherwise. metrics are calculated and stored in csv for now
     )
-    # parameters["use_cross_validation"] = False  # forced
+    parameters["use_cross_validation"] = False  # forced
+    # TODO: fix in frontend, no need to send these parameters at all, they are not used in current implementation of metrics calculation
+    # what was the logic behind this anyway?
+
     # 1. Fit embeddings first
     # TODO: 404 модель не найдена
     if fit_embeddings:

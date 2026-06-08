@@ -739,6 +739,10 @@ class CatBoostModelEmbeddings(CatBoostModel):
             self.metrics_dataset_name = ""
             self.test_metrics_dataset_name = ""
             if use_cross_validation:
+                if USE_DETAILED_LOG:
+                    logger.info(
+                        "Calculating train/test indexes for metrics (use_cross_validation=True)"
+                    )
                 train_test_indexes = self._get_train_test_indexes(X_y)
                 if calculate_metrics:
                     self.metrics_dataset_name = await self._save_dataset_to_temp(
@@ -1172,33 +1176,34 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         if item is not None:
             item = int(item)
+            pkl_path = os.path.join(col_path, f"{item}.pkl")
+            json_path = os.path.join(col_path, f"{item}.json")
+            cbm_path = os.path.join(col_path, f"{item}.cbm")
+
+            if not os.path.exists(pkl_path) and USE_DETAILED_LOG:
+                logger.warning(
+                    "No encoder file %s for item %s in column %s — skipping",
+                    pkl_path,
+                    item,
+                    column,
+                )
+                return
+
             if not self.field_encoders.get(column):
                 self.field_encoders[column] = {}
             self.field_encoders[column][item] = self._load_cb_encoder(
                 col_path, f"{item}.pkl"
             )
-            # try:
-            #     self.field_encoders[column][item] = self._load_cb_encoder(
-            #         col_path, f"{str(item).zfill(9)}.pkl"
-            #     )
-            #     item = str(item).zfill(9)
-            # except FileNotFoundError:
 
-            if os.path.exists(
-                os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-            ):
+            if os.path.exists(json_path):
                 if not self.strict_acc.get(column):
                     self.strict_acc[column] = {}
 
-                with open(
-                    os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-                ) as fp:
+                with open(json_path) as fp:
                     self.strict_acc[column][int(item)] = np.int64(
                         json.load(fp)["value"]
                     )
-            elif os.path.exists(
-                os.path.join(MODEL_FOLDER, self.uid, column, "{}.cbm".format(item))
-            ):
+            elif os.path.exists(cbm_path):
                 self._load_cb_model(column, int(item))
         else:
             if not self.field_encoders.get(column):
@@ -1267,10 +1272,22 @@ class CatBoostModelEmbeddings(CatBoostModel):
         pipeline = Pipeline(pipeline_list)
         dataset = pipeline.fit_transform(dataset)
 
-        self.classes = {}
-
         for y in self.y_columns:
             dataset[y] = dataset[y].replace(r"^\s*$", -1, regex=True)
+
+        datasets = {}
+        if train_test_indexes:
+            datasets["train"] = dataset.iloc[train_test_indexes[0]]
+            datasets["test"] = dataset.iloc[train_test_indexes[1]]
+        else:
+            datasets["train"] = dataset
+
+        # Collect classes from the train split so saved classes match trained items.
+        # Using the full dataset caused missing encoder files when items appeared only
+        # in the test split (cross-validation), breaking model load later.
+        train = datasets["train"]
+        self.classes = {}
+        for y in self.y_columns:
             if y == "cash_flow_details_code":
                 self.classes[y] = {}
                 for item in dataset["cash_flow_item_code"].unique():
@@ -1281,13 +1298,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     )
             else:
                 self.classes[y] = list(dataset[y].unique().astype(int))
-        datasets = {}
-
-        if train_test_indexes:
-            datasets["train"] = dataset.iloc[train_test_indexes[0]]
-            datasets["test"] = dataset.iloc[train_test_indexes[1]]
-        else:
-            datasets["train"] = dataset
 
         gc.collect()
         return datasets

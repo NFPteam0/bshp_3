@@ -53,7 +53,10 @@ async def fit(
         default=ModelTypes.catboost_txt
     ),  # ни на что не влияет, всегда эта модель
 ):
-    parameters["calculate_metrics"] = False  # TODO: forced
+    parameters["calculate_metrics"] = (
+        False  # forced, breaks otherwise. metrics are calculated and stored in csv for now
+    )
+    # parameters["use_cross_validation"] = False  # forced
     # 1. Fit embeddings first
     # TODO: 404 модель не найдена
     if fit_embeddings:
@@ -91,7 +94,7 @@ async def fit(
         if USE_DETAILED_LOG:
             logging.info("Loading columns: %s, %s", X_y.columns, X_y.shape)
         if X_y.empty:
-            raise ValueError
+            raise ValueError("No data. Save the data from 1C")
     except Exception as e:
         print(traceback.format_exc())
         logger.error(
@@ -161,7 +164,7 @@ async def predict(
         if USE_DETAILED_LOG:
             logging.info("Loading columns: %s, %s", dataset.columns, dataset.shape)
         if dataset.empty:
-            raise ValueError
+            raise ValueError("No data. Save the data from 1C")
     except Exception as e:
         print(traceback.format_exc())
         logger.error(

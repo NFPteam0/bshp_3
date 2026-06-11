@@ -39,6 +39,7 @@ logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
 SEED = 42
 ITEM = "cash_flow_item_code"
+TEST_FRAC = 0.15
 
 
 class CatBoostModelEmbeddings(CatBoostModel):
@@ -492,7 +493,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 all_data = make_all_data(df_i, f"{y}_norm")
                 all_classes = all_data[f"{y}_norm"].unique()
 
-                df_test = df_i.sample(frac=0.15, random_state=SEED)
+                df_test = df_i.sample(
+                    frac=TEST_FRAC, random_state=SEED
+                )  # might need better split, data is strongly time-dependent
 
                 _df_latest_i = encoder.transform(_df_latest)
                 _df_latest_i.drop(to_drop, inplace=True, axis=1)
@@ -638,7 +641,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             all_data = make_all_data(df, f"{y}_norm")
             all_classes = all_data[f"{y}_norm"].unique()
 
-            df_test = df.sample(frac=0.15, random_state=SEED)
+            df_test = df.sample(frac=TEST_FRAC, random_state=SEED)
 
             _df_latest = encoder.transform(_df_latest)
             _df_latest.drop(to_drop, inplace=True, axis=1)
@@ -739,6 +742,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
             self.metrics_dataset_name = ""
             self.test_metrics_dataset_name = ""
             if use_cross_validation:
+                # irrelevant, in external api layer we always use = False
+                # cross validation is used in train_on_field instead, every time anyway, not accounting this parameter
                 if USE_DETAILED_LOG:
                     logger.info(
                         "Calculating train/test indexes for metrics (use_cross_validation=True)"
@@ -829,16 +834,14 @@ class CatBoostModelEmbeddings(CatBoostModel):
         #     # "pred_cash_flow_details_name",
         # ]
         # TODO: не надо предсказывать пустые, если используем модели?
-        from .data_processing import check_fields
-
-        check_fields(
-            X_y,
-            [
-                col
-                for col in set(self.x_columns) | set(self.str_columns)
-                if col in X_y.columns
-            ],
-        )
+        # check_fields( # just logs (too much)
+        #     X_y,
+        #     [
+        #         col
+        #         for col in set(self.x_columns) | set(self.str_columns)
+        #         if col in X_y.columns
+        #     ],
+        # )
 
         for y in self.y_columns:
             if USE_DETAILED_LOG:
@@ -1067,7 +1070,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             j = min(i + batch_size, len(df))
             Xy = self.make_full(df=df, all_data=all_data, y=f"{y}", i=i, j=j)
             y_batch = Xy[f"{y}"]
-            X_batch = Xy.drop([y for y in self.y_columns if y in Xy.columns], axis=1)
+            # X_batch = Xy.drop([y for y in self.y_columns if y in Xy.columns], axis=1) #old thing, overwritten anyway
             # TODO: columns to upper layer
             X_batch = Xy.drop(columns=set(to_drop) | {y}, axis=1)
             # if X_batch has constant columns (all same)

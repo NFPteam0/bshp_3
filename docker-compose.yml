@@ -23,6 +23,7 @@ services:
     volumes:
       - ./bshp_ml/app:/app
       - ./models:/models
+      - ./metrics:/metrics
     networks:
       - custom
     depends_on:
@@ -45,6 +46,7 @@ services:
       - ./db/data:/data/db
     networks:
       - custom
+    restart: unless-stopped
 
 networks:
   custom:

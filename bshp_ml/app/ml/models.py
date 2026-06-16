@@ -1,44 +1,30 @@
-from abc import ABC, abstractmethod
-import logging
-from typing import Optional
-from enum import Enum
-import pickle
-from datetime import datetime, UTC
-import os
-import uuid
-from fastapi import Query
-import pandas as pd
-import numpy as np
-
 import gc
-
-import shutil
-from copy import deepcopy
 import json
+import logging
+import os
+import pickle
 import random
+import shutil
+import uuid
+from abc import ABC, abstractmethod
+from copy import deepcopy
+from datetime import UTC, datetime
+from typing import Optional
 
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier
-from catboost import CatBoostClassifier, Pool, sum_models, to_classifier
-
+import numpy as np
+import pandas as pd
 from ml.data_processing import (
     Checker,
     DataEncoder,
+    FeatureAdder,
     NanProcessor,
     Shuffler,
-    FeatureAdder,
 )
-from tasks.__init__ import Reader
+from schemas.models import ModelInfo, ModelStatuses, ModelTypes
+from settings import MODEL_FOLDER, USE_DETAILED_LOG, settings
+from sklearn.pipeline import Pipeline
+
 from db import db_processor
-from schemas.models import ModelStatuses, ModelTypes
-from settings import (
-    MODEL_FOLDER,
-    THREAD_COUNT,
-    USE_DETAILED_LOG,
-    USED_RAM_LIMIT,
-    DATASET_BATCH_LENGTH,
-    QUANTIZE,
-)
 
 logging.getLogger("bshp_data_processing_logger").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -191,6 +177,7 @@ class Model(ABC):
 
         self.metrics_dataset_name = ""
         self.test_metrics_dataset_name = ""
+        self.is_loaded = False
 
     async def fit(self, parameters):
         logger.info("Fitting")
@@ -363,12 +350,17 @@ class Model(ABC):
         self.fitting_end_date = datetime.now(UTC)
         logger.info("Fitting. Done")
 
-    async def _read_dataset(self, parameters) -> pd.DataFrame:
+    async def _read_dataset(self, parameters, limited=False) -> pd.DataFrame:
+        from tasks.__init__ import Reader
+
         data_filter = parameters["data_filter"]
         if USE_DETAILED_LOG:
             logger.info("Reading data from db")
         reader = Reader()
-        X_y = await reader.read(data_filter)
+        if limited:
+            X_y = await reader.read_limited(data_filter)
+        else:
+            X_y = await reader.read(data_filter)
 
         return X_y
 
@@ -505,6 +497,13 @@ class Model(ABC):
                 with open(os.path.join(path_to_model, "encoder.pkl"), "rb") as fp:
                     self.data_encoder = pickle.load(fp)
 
+    async def load_metadata(self, uid: str):
+        """Load parameters only — no model weights. Fast, low-memory startup."""
+        self.uid = uid
+        self._load_parameters()
+        if USE_DETAILED_LOG:
+            logger.info("Loaded metadata for %s %s", self.model_type, self.base_name)
+
     def _delete_all_models(self):
         path_to_dir = os.path.join(MODEL_FOLDER, self.uid)
 
@@ -515,6 +514,18 @@ class Model(ABC):
         path_to_encoder = os.path.join(path_to_dir, "encoder.pkl")
         if os.path.exists(path_to_encoder):
             os.remove(path_to_encoder)
+
+    def unload(self):
+        """Drop all in-memory model weights. Parameters/metadata are kept."""
+        self.field_models = {}
+        self.test_field_models = {}
+        self.data_encoder = None
+        if hasattr(self, "field_encoders"):
+            self.field_encoders = {}
+        self.is_loaded = False
+        gc.collect()
+        if USE_DETAILED_LOG:
+            logger.info("Unloaded model %s %s", self.model_type, self.base_name)
 
     async def load(self, uid):
         self.uid = uid
@@ -531,6 +542,7 @@ class Model(ABC):
                     self._load_column_model(y_col)
 
             self._load_encoder()
+        self.is_loaded = True
 
     async def save(self, without_models=False):
         if not os.path.isdir(MODEL_FOLDER):
@@ -594,6 +606,9 @@ class Model(ABC):
 class ModelManager:
     def __init__(self):
         self.models = []
+        self.max_models = (
+            settings.MAX_MODELS
+        )  # max models for training at the same time
 
     async def read_models(self):
         models = []
@@ -619,7 +634,9 @@ class ModelManager:
                     model = None
 
                     model = self._get_new_model(ModelTypes.extfstxt, "all_bases")
-                    await model.load(uid=str(uuid.uuid4))
+                    await model.load(
+                        uid=str(uuid.uuid4)
+                    )  # fsttxt is loaded anyway, from /pretrained, id doest matter
 
                     if model:
                         models.append(
@@ -650,7 +667,7 @@ class ModelManager:
                 model = self._get_new_model(
                     ModelTypes(parameters["model_type"]), parameters["base_name"]
                 )
-                await model.load(parameters["uid"])
+                await model.load_metadata(parameters["uid"])
                 # except Exception as e:
                 #     pass
 
@@ -685,7 +702,49 @@ class ModelManager:
     async def write_model(self, model):
         await model.save()
 
-    def get_model(self, model_type=ModelTypes.rf, base_name="all_bases", log=True):
+    async def get_model(
+        self, model_type=ModelTypes.rf, base_name="all_bases", log=True, to_delete=False
+    ):
+        if log:
+            logger.info("Get model with params: %s %s", model_type, base_name)
+        model_list = [
+            el
+            for el in self.models
+            if el["model_type"] == model_type and el["base_name"] == base_name
+        ]
+        if model_list:
+            model = model_list[-1]["model"]
+        else:
+            model = self._get_new_model(model_type, base_name)  # TODO: ?
+            return model
+
+        if (
+            not model.is_loaded
+            and model.status != ModelStatuses.ERROR
+            and not to_delete
+        ):
+            if USE_DETAILED_LOG:
+                logger.info(
+                    "Model not in memory, loading from disk: %s %s",
+                    model_type,
+                    base_name,
+                )
+            await model.load(model.uid)
+        return model
+
+    def unload_model(self, model_type=ModelTypes.rf, base_name="all_bases"):
+        model_list = [
+            el
+            for el in self.models
+            if el["model_type"] == model_type and el["base_name"] == base_name
+        ]
+        if model_list:
+            model_list[-1]["model"].unload()
+            logger.info("Model unloaded: %s %s", model_type, base_name)
+
+    def _sync_get_model(
+        self, model_type=ModelTypes.rf, base_name="all_bases", log=True
+    ):
         if log:
             logger.info("Get model with params: %s %s", model_type, base_name)
         model_list = [
@@ -731,7 +790,7 @@ class ModelManager:
         if c_models:
             model = c_models[0]
         else:
-            model = self.get_model(model_type, base_name)
+            model = await self.get_model(model_type, base_name, to_delete=True)
 
         self.models = [
             el
@@ -747,7 +806,16 @@ class ModelManager:
             shutil.rmtree(model_dir)
 
     async def get_info(self, model_type=ModelTypes.rf, base_name=""):
-        model = self.get_model(model_type=model_type, base_name=base_name, log=False)
+        model_list = [
+            el
+            for el in self.models
+            if el["model_type"] == model_type and el["base_name"] == base_name
+        ]
+        if model_list:
+            model = model_list[-1]["model"]
+        else:
+            # Not registered at all — return empty defaults
+            return ModelInfo(status=ModelStatuses.ERROR, error_text="Model not found")
 
         return {
             "status": model.status,

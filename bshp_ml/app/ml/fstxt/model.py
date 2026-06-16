@@ -1,34 +1,24 @@
 import asyncio
-import copy
-from functools import lru_cache
 import gc
-import json
 import logging
-import os
+from functools import lru_cache
 
-from fastapi import HTTPException
-from sklearn.pipeline import Pipeline
-from .utils import prepare_sentences, preprocess_text
 import numpy as np
+import pandas as pd
 from gensim.models import FastText
-from ..models import Model, get_model_manager
 from ml.data_processing import (
     Checker,
-    DataEncoder,
-    FeatureAdder,
     NanProcessor,
-    Shuffler,
 )
 from schemas.models import EmbedPredictionsRow, ModelStatuses, ModelTypes
-import pandas as pd
 from settings import (
     MODEL_FOLDER,
-    THREAD_COUNT,
     USE_DETAILED_LOG,
-    USED_RAM_LIMIT,
-    DATASET_BATCH_LENGTH,
-    QUANTIZE,
 )
+from sklearn.pipeline import Pipeline
+
+from ..models import Model, get_model_manager
+from .utils import prepare_sentences
 
 # prep_sents = [preprocess_text(" ".join(sent)).split() for sent in prepare_sentences(df, txt_cols)]
 
@@ -79,7 +69,8 @@ class FastTextModel(Model):
                         "data_filter": {}
                         # if self.base_name != "all_bases"
                         # else None
-                    }
+                    },
+                    limited=True,
                 )
                 self.all_classes_names = {
                     col: df[col].unique() for col in self.y_columns
@@ -102,11 +93,12 @@ class FastTextModel(Model):
                     "Classes found: %s",
                     str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
                 )
-            except KeyError as e:
+            except KeyError:
                 # TODO: другой эксцепт
                 logger.warning("No classes for embeddings detected: {e}")
 
             self._load_pretrained()
+        self.is_loaded = True
 
     def _load_pretrained(self, model_folder=MODEL_FOLDER):
         # NOTE: у fasttext есть ивенты из коробки
@@ -160,6 +152,8 @@ class FastTextModel(Model):
                 total_examples=len(new_sentences),
                 epochs=self._model.epochs,
             )
+            FastTextModel.wv_cached.cache_clear()
+            FastTextModel.sentence_vector_cached.cache_clear()
 
     async def _fit(self, df: pd.DataFrame, parameters, is_first=False):
         return await asyncio.to_thread(self._sync_fit, df, parameters, is_first)
@@ -216,7 +210,6 @@ class FastTextModel(Model):
         pipeline = Pipeline(pipeline_list)
         if USE_DETAILED_LOG:
             logger.warning("Predicting, Shape %s", X.shape)
-            logger.warning("Predicting, Shape %s", X.shape)
         try:
             X = pipeline.fit_transform(X)
         except ValueError as e:
@@ -233,42 +226,48 @@ class FastTextModel(Model):
         else:
             set_from = X
         if set_classes:
-            self.all_classes_names = {
-                col: set_from[col].unique() for col in self.y_columns
-            }
-            # TODO: коды сюда?
-            if USE_DETAILED_LOG:
-                logger.info(
-                    "Classes found: %s",
-                    str({cls: len(lst) for cls, lst in self.all_classes_names.items()}),
-                )
-            self.name2code = {
+            name2code = {
                 "cash_flow_item_name": "cash_flow_item_code",
                 "cash_flow_details_name": "cash_flow_details_code",
                 "year": "year",
             }
-            self.all_classes_codes = {
+            # build locally first — bound before self is updated, so concurrent
+            # overwrites of self.all_classes_* can't corrupt this call
+            local_classes_names = {
+                col: set_from[col].unique() for col in self.y_columns
+            }
+            local_classes_codes = {
                 col: dict(
-                    zip(
-                        set_from[col].unique(),
-                        set_from[self.name2code[col]]
-                        .replace("", -1)
-                        .fillna(-1)
-                        .astype(int),
-                    )
+                    set_from.groupby(col)[name2code[col]]
+                    .first()
+                    .replace("", -1)
+                    .fillna(-1)
+                    .astype(int)
                 )
                 for col in self.y_columns
             }
+            self.name2code = name2code
+            self.all_classes_names = local_classes_names
+            self.all_classes_codes = local_classes_codes
+            # TODO: коды сюда?
             if USE_DETAILED_LOG:
+                logger.info(
+                    "Classes found: %s",
+                    str({cls: len(lst) for cls, lst in local_classes_names.items()}),
+                )
                 for col in self.y_columns:
-                    empty = set_from[self.name2code[col]].isna() | (
-                        set_from[self.name2code[col]].astype(str).str.strip() == ""
+                    empty = set_from[name2code[col]].isna() | (
+                        set_from[name2code[col]].astype(str).str.strip() == ""
                     )
                     if empty.any():
                         logger.warning(
-                            f"Empty {self.name2code[col]} at number={set_from.loc[empty.idxmax(), 'number']}"
+                            f"Empty {name2code[col]} at number={set_from.loc[empty.idxmax(), 'number']}"
                         )
-        if self.all_classes_names is None or self.all_classes_codes is None:
+        else:
+            local_classes_names = self.all_classes_names
+            local_classes_codes = self.all_classes_codes
+
+        if local_classes_names is None or local_classes_codes is None:
             raise ValueError(f"Model is not ready, it's {self.status}. Fit it before.")
 
         # X[self.y_columns] = ""
@@ -302,7 +301,7 @@ class FastTextModel(Model):
 
         for y in self.y_columns:
             class_matrix, class_names = self.build_class_matrix(
-                self.all_classes_names[y], self.all_classes_codes[y]
+                local_classes_names[y], local_classes_codes[y]
             )
 
             preds, probs = self.batched_predict(
@@ -324,7 +323,7 @@ class FastTextModel(Model):
     @lru_cache(maxsize=20_000)
     def wv_cached(word: str, base_name: str, model_type: str):
         model_manager = get_model_manager()
-        model = model_manager.get_model(model_type, base_name, log=False)
+        model = model_manager._sync_get_model(model_type, base_name, log=False)
         return model._model.wv[word]
 
     @staticmethod

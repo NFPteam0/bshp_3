@@ -1,15 +1,15 @@
+import json
 import logging
 import traceback
 import uuid
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
-from schemas.models import DataRow, ExtDataRow, ModelTypes, EmbedPredictionsRow
-from schemas.tasks import TaskResponse
-from fastapi.encoders import jsonable_encoder
-import json
 
-from tasks.processing import process_fitting_model, process_uploading_task
-from tasks.__init__ import task_manager
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
+from fastapi.encoders import jsonable_encoder
 from ml.models import ModelManager, get_model_manager
+from schemas.models import ExtDataRow, ModelTypes
+from schemas.tasks import TaskResponse
+from tasks.__init__ import task_manager
+from tasks.processing import process_fitting_model
 
 router = APIRouter(
     prefix="/embeddings", tags=["Embedding модель (по умолчанию FastText)"]
@@ -87,7 +87,7 @@ async def predict_embeddings(
         # for row in X:
         #     X_list.append(row.model_dump())
 
-        model = model_manager.get_model(model_type, base_name)
+        model = model_manager._sync_get_model(model_type, base_name)
         result = []
         X_y_list = json.loads(await model.predict(jsonable_encoder(X)))
         result = X_y_list

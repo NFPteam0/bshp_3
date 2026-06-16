@@ -5,13 +5,13 @@ import logging
 import os
 import pickle
 import shutil
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from catboost import Pool
+from catboost import CatboostError, Pool
 from ml.cb.classifier import (
     CatBoostClassifier,
-    Pool,
     sum_models,
 )
 from ml.data_processing import (
@@ -19,6 +19,7 @@ from ml.data_processing import (
     FeatureAdder,
     NanProcessor,
 )
+from ml.metrics import MetricsTrain, write_in_csv
 from schemas.models import ModelStatuses, ModelTypes
 from settings import (
     DEVICES,
@@ -38,6 +39,7 @@ logging.getLogger("bshp_data_processing_logger")
 logger = logging.getLogger(__name__)
 SEED = 42
 ITEM = "cash_flow_item_code"
+TEST_FRAC = 0.15
 
 
 class CatBoostModelEmbeddings(CatBoostModel):
@@ -128,6 +130,28 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "categorical": self.categorical,
             "date_columns": self.date_columns,
         }
+        self.field_accuracies: dict[str, float] = {}
+
+    def _fill_metrics(
+        self,
+        data_size: int,
+        time_start: "datetime",
+        time_end: "datetime",
+    ) -> MetricsTrain:
+        elapsed = (time_end - time_start).total_seconds()
+        metrics = MetricsTrain(
+            model_name=self.model_type.value,
+            dataset_name=self.base_name,
+            accuracy_year=self.field_accuracies.get("year", 0.0),
+            accuracy_item=self.field_accuracies.get("cash_flow_item_code", 0.0),
+            accuracy_details=self.field_accuracies.get("cash_flow_details_code", 0.0),
+            time=elapsed,
+            time_start=time_start.isoformat(),
+            time_end=time_end.isoformat(),
+            data_size=data_size,
+        )
+        write_in_csv(metrics)
+        return metrics
 
     def train(
         self,
@@ -159,7 +183,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             if USE_DETAILED_LOG:
                 logger.info(f"BATCH {n + 1} of total {len(df_train) // BSIZE + 1}")
             if model is None:
-                model = CatBoostClassifier(**params)
+                model = CatBoostClassifier(**params, allow_const_label=True)
                 batch.set_baseline(np.zeros(shape=(batch.num_row(), len(all_data))))
                 test_pool.set_baseline(
                     np.zeros(shape=(test_pool.num_row(), len(all_data)))
@@ -167,7 +191,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                 model.fit(X=batch, eval_set=test_pool)
             else:
-                model_new = CatBoostClassifier(**params)
+                model_new = CatBoostClassifier(**params, allow_const_label=True)
                 base = model.predict(batch, prediction_type="RawFormulaVal")
                 base[np.isneginf(base)] = -1
                 batch.set_baseline(base)
@@ -314,7 +338,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         _params = params.copy()
                         _params["use_best_model"] = False
 
-                        current_model_test = CatBoostClassifier(**_params)
+                        current_model_test = CatBoostClassifier(
+                            **_params, allow_const_label=True
+                        )
                         current_model_test = current_model_test.fit(
                             X=final_batch.drop(y, axis=1),
                             y=final_batch[y],
@@ -322,7 +348,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                             cat_features=cat_idxs,
                         )
                         best_model = current_model_test
-        return best_model
+        return best_model, best_score
 
     def train_on_field(
         self, df: pd.DataFrame, y: str, to_drop: list[str], parameters: dict
@@ -431,6 +457,20 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                 df_i.drop(to_drop, inplace=True, axis=1)
 
+                # Guard: constant features — no model can learn, use majority class
+                _feature_cols = [c for c in df_i.columns if c != f"{y}_norm"]
+                if not _feature_cols or df_i[_feature_cols].nunique().max() <= 1:
+                    this_label = df_i[f"{y}_norm"].mode().iloc[0]
+                    if USE_DETAILED_LOG:
+                        logger.warning(
+                            "Item %s has constant features after column drop — using majority label %s",
+                            item,
+                            this_label,
+                        )
+                    self.field_accuracies.setdefault(y, []).append(0.0)
+                    self.strict_acc[y][int(item)] = this_label
+                    continue
+
                 all_data = make_all_data(df_i, f"{y}_norm")
                 all_classes = all_data[f"{y}_norm"].unique()
 
@@ -438,10 +478,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     logger.info("Total len of classes data: %s", len(all_data))
                     logger.info(f"X columns: {df_i.columns}, shape: {df_i.shape}")
                 if len(all_data) == 1:
+                    self.field_accuracies.setdefault(y, []).append(1.0)
                     # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                     this_label = all_data[f"{y}_norm"].iloc[0]
                     bscores.extend([1 for _ in range(len(df_i[f"{y}_norm"]))])
-                    logger.info("Only one details code, no need for model")
+                    if USE_DETAILED_LOG:
+                        logger.info("Only one details code, no need for model")
                     # TODO: сохранить словарь
                     self.strict_acc[y][int(item)] = this_label
                     continue
@@ -451,7 +493,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 all_data = make_all_data(df_i, f"{y}_norm")
                 all_classes = all_data[f"{y}_norm"].unique()
 
-                df_test = df_i.sample(frac=0.15, random_state=SEED)
+                df_test = df_i.sample(
+                    frac=TEST_FRAC, random_state=SEED
+                )  # might need better split, data is strongly time-dependent
 
                 _df_latest_i = encoder.transform(_df_latest)
                 _df_latest_i.drop(to_drop, inplace=True, axis=1)
@@ -491,20 +535,26 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     all_data=all_data,
                     y=f"{y}_norm",
                 )
-                model_i = self.gridsearch(
-                    all_classes=all_classes,
-                    df_train=df_train,
-                    df_test=df_test,
-                    cat_idxs=cat_idxs,
-                    test_pool=test_pool,
-                    y=f"{y}_norm",
-                    to_drop=[],
-                    lr=parameters.get("lr", 0.01),
-                    trees=parameters.get("trees", 30),
-                    all_data=all_data,
-                    _df_latest=_df_latest_i,
-                )
-                self.field_models[y][int(item)] = model_i
+                try:
+                    model_i, acc_i = self.gridsearch(
+                        all_classes=all_classes,
+                        df_train=df_train,
+                        df_test=df_test,
+                        cat_idxs=cat_idxs,
+                        test_pool=test_pool,
+                        y=f"{y}_norm",
+                        to_drop=[],
+                        lr=parameters.get("lr", 0.01),
+                        trees=parameters.get("trees", 30),
+                        all_data=all_data,
+                        _df_latest=_df_latest_i,
+                    )
+                    self.field_models[y][int(item)] = model_i
+                    self.field_accuracies.setdefault(y, []).append(acc_i)
+                except CatboostError as e:
+                    logger.error(f"Error while training model for item {item}: {e}")
+                    self.field_accuracies.setdefault(y, []).append(0.0)
+                    raise e
 
                 # TODO: если fsttxt model справляется лучше?
                 if False:
@@ -521,6 +571,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         self._save_cb_model(model_i, column=y, item=int(item))
                         ...
                 self._save_cb_model(model_i, column=y, item=int(item))
+            # AVG for details
+            if isinstance(self.field_accuracies.get(y), list):
+                self.field_accuracies[y] = (
+                    float(sum(self.field_accuracies[y]) / len(self.field_accuracies[y]))
+                    if self.field_accuracies[y]
+                    else 0.0
+                )
 
         else:
             if USE_DETAILED_LOG:
@@ -547,6 +604,19 @@ class CatBoostModelEmbeddings(CatBoostModel):
             )
             df.drop(to_drop, axis=1, inplace=True)
 
+            _feature_cols = [c for c in df.columns if c != f"{y}_norm"]
+            if not _feature_cols or df[_feature_cols].nunique().max() <= 1:
+                this_label = df[f"{y}_norm"].mode().iloc[0]
+                if USE_DETAILED_LOG:
+                    logger.warning(
+                        "Field %s has constant features after column drop — using majority label %s",
+                        y,
+                        this_label,
+                    )
+                self.field_accuracies[y] = 0.0
+                self.strict_acc[y] = this_label
+                return
+
             all_data = make_all_data(df, f"{y}_norm")
             all_classes = all_data[f"{y}_norm"].unique()
             if USE_DETAILED_LOG:
@@ -558,6 +628,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 logger.info(f"X columns: {df.columns}, shape: {df.shape}")
 
             if len(all_data) == 1:
+                self.field_accuracies.setdefault(y, []).append(1.0)
                 # TODO: get rid of this, save encoder to .pkl
                 # this_label = det_unmap1.get(all_data[f"{y}_norm"].iloc[0])
                 this_label = all_data[f"{y}_norm"].iloc[0]
@@ -570,7 +641,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             all_data = make_all_data(df, f"{y}_norm")
             all_classes = all_data[f"{y}_norm"].unique()
 
-            df_test = df.sample(frac=0.15, random_state=SEED)
+            df_test = df.sample(frac=TEST_FRAC, random_state=SEED)
 
             _df_latest = encoder.transform(_df_latest)
             _df_latest.drop(to_drop, inplace=True, axis=1)
@@ -602,7 +673,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 ],
                 all_data=all_data,
             )
-            model_i = self.gridsearch(
+            model_i, acc_i = self.gridsearch(
                 all_classes=all_classes,
                 df_train=df_train,
                 df_test=df_test,
@@ -616,6 +687,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 _df_latest=_df_latest,
             )
             self.field_models[y] = model_i
+            self.field_accuracies[y] = float(acc_i)
             self._save_cb_model(model_i, y)
 
     async def _fit(self, df: pd.DataFrame, parameters: dict, is_first=True):
@@ -623,8 +695,11 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
     def __sync_fit(self, df: pd.DataFrame, parameters: dict, is_first=True):
         is_first = True  # TODO: ?
+        self.field_accuracies = {}
+        time_start = datetime.utcnow()
         if USE_DETAILED_LOG:
             logger.info("{} fit".format("First" if is_first else "continuous"))
+            logger.info(f"Starting time: {time_start}, Shape: {df.shape}")
 
         for y in self.y_columns:
             self.strict_acc[y] = {}
@@ -634,8 +709,15 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 df=df, y=y, to_drop=self.y_columns, parameters=parameters
             )
             gc.collect()
-            # self._save_cb_model(model, column=y, item=item)
-            # self._load_all_models()
+
+        time_end = datetime.utcnow()
+        self._fill_metrics(
+            data_size=len(df),
+            time_start=time_start,
+            time_end=time_end,
+        )
+        # self._save_cb_model(model, column=y, item=item)
+        # self._load_all_models()
         # self._load_all_models()
 
     async def fit(self, Xy_api: dict, parameters):
@@ -660,6 +742,12 @@ class CatBoostModelEmbeddings(CatBoostModel):
             self.metrics_dataset_name = ""
             self.test_metrics_dataset_name = ""
             if use_cross_validation:
+                # irrelevant, in external api layer we always use = False
+                # cross validation is used in train_on_field instead, every time anyway, not accounting this parameter
+                if USE_DETAILED_LOG:
+                    logger.info(
+                        "Calculating train/test indexes for metrics (use_cross_validation=True)"
+                    )
                 train_test_indexes = self._get_train_test_indexes(X_y)
                 if calculate_metrics:
                     self.metrics_dataset_name = await self._save_dataset_to_temp(
@@ -746,16 +834,14 @@ class CatBoostModelEmbeddings(CatBoostModel):
         #     # "pred_cash_flow_details_name",
         # ]
         # TODO: не надо предсказывать пустые, если используем модели?
-        from .data_processing import check_fields
-
-        check_fields(
-            X_y,
-            [
-                col
-                for col in set(self.x_columns) | set(self.str_columns)
-                if col in X_y.columns
-            ],
-        )
+        # check_fields( # just logs (too much)
+        #     X_y,
+        #     [
+        #         col
+        #         for col in set(self.x_columns) | set(self.str_columns)
+        #         if col in X_y.columns
+        #     ],
+        # )
 
         for y in self.y_columns:
             if USE_DETAILED_LOG:
@@ -810,7 +896,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         Xy1[f"{y}_norm"] = y_pred.ravel()
 
                         if USE_DETAILED_LOG:
-                            logging.info(f"Feature names: {model.feature_names_}")
+                            logger.info(f"Feature names: {model.feature_names_}")
                             importance = (
                                 pd.DataFrame(
                                     {
@@ -821,7 +907,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                                 .sort_values("imp", ascending=False)
                                 .head()
                             )
-                            logging.info(
+                            logger.info(
                                 f"For {y} most important fields are:\n%s",
                                 importance.to_json,
                             )
@@ -843,7 +929,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     #     year_mask = X_y[ITEM].isin(self.items_wo_year)
                     X = X_y.copy()
                     model = field_models[y]
-                    logging.info("Encoders: %s", list(self.field_encoders.keys()))
+                    if USE_DETAILED_LOG:
+                        logger.info("Encoders: %s", list(self.field_encoders.keys()))
                     encoder = self.field_encoders[y]
                     X = encoder.transform(X)
                     # if "pred_cash_flow_item_name" in X.columns:
@@ -870,7 +957,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         cat_features=cat_idxs,
                     )
                     if USE_DETAILED_LOG:
-                        logging.info(f"Feature names: {model.feature_names_}")
+                        logger.info(f"Feature names: {model.feature_names_}")
                         importance = (
                             pd.DataFrame(
                                 {
@@ -881,7 +968,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                             .sort_values("imp", ascending=False)
                             .head()
                         )
-                        logging.info(
+                        logger.info(
                             f"For {y} most important fields are:\n%s",
                             importance.to_json,
                         )
@@ -895,7 +982,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
                     if USE_DETAILED_LOG:
                         _js = json.loads(
-                            X_y.to_json(
+                            X_y.head().to_json(
                                 orient="records",
                                 force_ascii=False,
                             )
@@ -983,9 +1070,18 @@ class CatBoostModelEmbeddings(CatBoostModel):
             j = min(i + batch_size, len(df))
             Xy = self.make_full(df=df, all_data=all_data, y=f"{y}", i=i, j=j)
             y_batch = Xy[f"{y}"]
-            X_batch = Xy.drop([y for y in self.y_columns if y in Xy.columns], axis=1)
+            # X_batch = Xy.drop([y for y in self.y_columns if y in Xy.columns], axis=1) #old thing, overwritten anyway
             # TODO: columns to upper layer
             X_batch = Xy.drop(columns=set(to_drop) | {y}, axis=1)
+            # if X_batch has constant columns (all same)
+            if X_batch.nunique().max() == 1:
+                if USE_DETAILED_LOG:
+                    logger.warning(
+                        "Batch has constant columns for field: %s, Values: %s",
+                        y,
+                        y_batch,
+                    )
+                y_batch[:] = y_batch.iloc[0]
             pool = Pool(
                 X_batch,
                 label=y_batch,
@@ -1083,33 +1179,34 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         if item is not None:
             item = int(item)
+            pkl_path = os.path.join(col_path, f"{item}.pkl")
+            json_path = os.path.join(col_path, f"{item}.json")
+            cbm_path = os.path.join(col_path, f"{item}.cbm")
+
+            if not os.path.exists(pkl_path) and USE_DETAILED_LOG:
+                logger.warning(
+                    "No encoder file %s for item %s in column %s — skipping",
+                    pkl_path,
+                    item,
+                    column,
+                )
+                return
+
             if not self.field_encoders.get(column):
                 self.field_encoders[column] = {}
             self.field_encoders[column][item] = self._load_cb_encoder(
                 col_path, f"{item}.pkl"
             )
-            # try:
-            #     self.field_encoders[column][item] = self._load_cb_encoder(
-            #         col_path, f"{str(item).zfill(9)}.pkl"
-            #     )
-            #     item = str(item).zfill(9)
-            # except FileNotFoundError:
 
-            if os.path.exists(
-                os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-            ):
+            if os.path.exists(json_path):
                 if not self.strict_acc.get(column):
                     self.strict_acc[column] = {}
 
-                with open(
-                    os.path.join(MODEL_FOLDER, self.uid, column, "{}.json".format(item))
-                ) as fp:
+                with open(json_path) as fp:
                     self.strict_acc[column][int(item)] = np.int64(
                         json.load(fp)["value"]
                     )
-            elif os.path.exists(
-                os.path.join(MODEL_FOLDER, self.uid, column, "{}.cbm".format(item))
-            ):
+            elif os.path.exists(cbm_path):
                 self._load_cb_model(column, int(item))
         else:
             if not self.field_encoders.get(column):
@@ -1178,10 +1275,22 @@ class CatBoostModelEmbeddings(CatBoostModel):
         pipeline = Pipeline(pipeline_list)
         dataset = pipeline.fit_transform(dataset)
 
-        self.classes = {}
-
         for y in self.y_columns:
             dataset[y] = dataset[y].replace(r"^\s*$", -1, regex=True)
+
+        datasets = {}
+        if train_test_indexes:
+            datasets["train"] = dataset.iloc[train_test_indexes[0]]
+            datasets["test"] = dataset.iloc[train_test_indexes[1]]
+        else:
+            datasets["train"] = dataset
+
+        # Collect classes from the train split so saved classes match trained items.
+        # Using the full dataset caused missing encoder files when items appeared only
+        # in the test split (cross-validation), breaking model load later.
+        train = datasets["train"]
+        self.classes = {}
+        for y in self.y_columns:
             if y == "cash_flow_details_code":
                 self.classes[y] = {}
                 for item in dataset["cash_flow_item_code"].unique():
@@ -1192,13 +1301,6 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     )
             else:
                 self.classes[y] = list(dataset[y].unique().astype(int))
-        datasets = {}
-
-        if train_test_indexes:
-            datasets["train"] = dataset.iloc[train_test_indexes[0]]
-            datasets["test"] = dataset.iloc[train_test_indexes[1]]
-        else:
-            datasets["train"] = dataset
 
         gc.collect()
         return datasets

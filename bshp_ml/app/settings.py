@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     QUANTIZE: bool = False
     TASK_TYPE: str = "CPU"
     DEVICES: str | None = None
+    METRICS_FOLDER: Path = BASE_DIR / "metrics"
+    MAX_MODELS: int = 2
 
     class Config:
         env_file = "../../.env"

@@ -700,7 +700,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 lr=parameters.get("lr", 0.01),
                 trees=parameters.get("trees", 30),
                 all_data=all_data,
-                _df_latest=_df_latest,
+                _df_latest=None if y == "year" else _df_latest,
             )
             self.field_models[y] = model_i
             self.field_accuracies[y] = float(acc_i)
@@ -1018,6 +1018,18 @@ class CatBoostModelEmbeddings(CatBoostModel):
             else:
                 X_y[y] = X_y[y].astype(str)
         return X_y.to_dict(orient="records")
+
+        # records = X_y.to_dict(orient="records")
+        # # Sanitize non-finite floats before serialization. The per-item details
+        # # loop writes back inconsistent column sets across items (e.g. strict
+        # # items keep the encoder-created class_rate_*, model items drop it; unseen
+        # # items leave *_norm unfilled), so internal helper columns can end up NaN.
+        # # Starlette's JSONResponse uses allow_nan=False and 500s on NaN/inf.
+        # for record in records:
+        #     for key, value in record.items():
+        #         if isinstance(value, float) and not math.isfinite(value):
+        #             record[key] = None
+        # return records
         # if self.need_to_encode:
         #     X_y = pipeline.named_steps["data_encoder"].inverse_transform(X_y)
 
@@ -1290,6 +1302,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         pipeline = Pipeline(pipeline_list)
         dataset = pipeline.fit_transform(dataset)
+        dataset = dataset.sample(frac=1, random_state=SEED).reset_index(drop=True)
 
         for y in self.y_columns:
             dataset[y] = dataset[y].replace(r"^\s*$", -1, regex=True)

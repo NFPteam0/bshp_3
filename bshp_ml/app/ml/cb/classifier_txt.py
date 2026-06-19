@@ -78,7 +78,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         # self.categorical.extend([f"pred_pp_{y}" for y in self.fsttxt_columns])
         # self.float_columns.extend([f"prob_pp_{y}" for y in self.fsttxt_columns])
-        self.float_columns.extend([f"class_rate_{y}" for y in self.fsttxt_columns])
+        # self.float_columns.extend([f"class_rate_{y}" for y in self.fsttxt_columns])
 
         self.str_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
@@ -97,7 +97,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         )
         self.x_columns.extend(
             [f"pred_{y}" for y in self.fsttxt_columns]
-            + [f"class_rate_{y}" for y in self.fsttxt_columns]
+            # + [f"class_rate_{y}" for y in self.fsttxt_columns]
             + [
                 "payment_purpose",
                 "contract_name",
@@ -373,19 +373,25 @@ class CatBoostModelEmbeddings(CatBoostModel):
         #     .str.strip()
         # )
 
-        UNFEATURED = [
-            "company_inn",
-            "contractor_name",
-            "contractor_kpp",
-            "qty",
-            "price",
-            "sum",
-            "contractor_account_number",
-            "company_account_number",
-            "article_row_number",
-            "row_number",
-            "number",
-        ] + [f"pred_pp_{y}" for y in self.fsttxt_columns]
+        UNFEATURED = (
+            [
+                "company_inn",
+                "contractor_name",
+                "contractor_kpp",
+                "qty",
+                "price",
+                "sum",
+                "contractor_account_number",
+                "company_account_number",
+                "article_row_number",
+                "row_number",
+                "number",
+            ]
+            + [f"pred_pp_{y}" for y in self.fsttxt_columns]
+            + [
+                f"class_rate_{y}" for y in self.fsttxt_columns
+            ]  # wrong count somitimes. TODO: fix counting that field in encoder and check accuracies
+        )
 
         if y != "year":
             UNFEATURED += ["pred_pp_year", "prob_pp_year", "pred_year", "prob_year"]
@@ -452,6 +458,13 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         + self.fsttxt_columns
                         + ["uploading_date"]
                         if (c in df_i.columns and c not in categorical)
+                    ]
+                )
+                to_drop.extend(
+                    [
+                        c
+                        for c in UNFEATURED
+                        if c not in categorical and c in df_i.columns
                     ]
                 )
 
@@ -589,7 +602,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 name_col="cash_flow_item_name"
                 if y == "cash_flow_item_code"
                 else "year",
-            )
+            )  # encoder adds some fields too ... TODO: one place for all
             df = encoder.fit_transform(df, None)
             encoder.save(os.path.join(MODEL_FOLDER, self.uid, y))
             self.field_encoders[y] = encoder
@@ -601,6 +614,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     for c in self.str_columns + self.fsttxt_columns + ["uploading_date"]
                     if (c in df.columns and c not in self.categorical)
                 ]
+            )
+            to_drop.extend(
+                [c for c in UNFEATURED if c not in categorical and c in df.columns]
             )
             df.drop(to_drop, axis=1, inplace=True)
 

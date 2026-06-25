@@ -633,6 +633,14 @@ class ModelManager:
             )
             return True
 
+    def get_training_models_names(self) -> list[str]:
+        """Get list of currently training models names for logging purposes."""
+        return [
+            f"{model['model'].model_type.value}_{model['model'].base_name}"
+            for model in self.models
+            if model["model"].status == ModelStatuses.FITTING
+        ]
+
     async def release_training_slot(self) -> None:
         async with self._slot_lock:
             if self.active_training > 0:

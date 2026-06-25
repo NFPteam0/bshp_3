@@ -1292,6 +1292,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         pipeline_list.append(("checker", Checker(self.parameters)))
         pipeline_list.append(("nan_processor", NanProcessor(self.parameters)))
         pipeline_list.append(("feature_adder", FeatureAdder(self.parameters)))
+        # old logic
         # if self.need_to_encode:
         #     if need_to_initialize:
         #         self.data_encoder = DataEncoder(self.parameters)
@@ -1302,7 +1303,10 @@ class CatBoostModelEmbeddings(CatBoostModel):
 
         pipeline = Pipeline(pipeline_list)
         dataset = pipeline.fit_transform(dataset)
+        # this shuffle instead of sklearn.shuffler
         dataset = dataset.sample(frac=1, random_state=SEED).reset_index(drop=True)
+        if USE_DETAILED_LOG:
+            logger.info("Performed shuffle, shape: %s", dataset.shape)
 
         for y in self.y_columns:
             dataset[y] = dataset[y].replace(r"^\s*$", -1, regex=True)

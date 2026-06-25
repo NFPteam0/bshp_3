@@ -18,9 +18,7 @@ from fastapi.encoders import jsonable_encoder
 from ml.models import ModelManager, get_model_manager
 from schemas.models import ExtDataRow, ModelTypes
 from schemas.tasks import TaskResponse
-from settings import (
-    USE_DETAILED_LOG,
-)
+from settings import USE_DETAILED_LOG, settings
 from tasks.__init__ import Reader, task_manager
 from tasks.processing import (
     process_fitting_model,
@@ -83,7 +81,7 @@ async def fit(
             if not await model_manager.acquire_training_slot():
                 raise HTTPException(
                     status_code=429,
-                    detail="Max concurrent training jobs reached. Try again later.",
+                    detail=f"Max models limit reached ({settings.MAX_MODELS} models training: {', '.join(model_manager.get_training_models_names())}). Try again later.",
                     headers={"Retry-After": "60"},
                 )
             background_tasks.add_task(
@@ -107,7 +105,7 @@ async def fit(
     if not await model_manager.acquire_training_slot():
         raise HTTPException(
             status_code=429,
-            detail="Max concurrent training jobs reached. Try again later.",
+            detail=f"Max models limit reached ({settings.MAX_MODELS} models training: {', '.join(model_manager.get_training_models_names())}). Try again later.",
             headers={"Retry-After": "60"},
         )
 

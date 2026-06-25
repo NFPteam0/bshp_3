@@ -41,6 +41,18 @@ SEED = 42
 ITEM = "cash_flow_item_code"
 TEST_FRAC = 0.15
 
+# --- Year post-rules (accounting logic) -------------------------------------
+# Harvest year ("год урожая") is meaningful only for crop/production items and is
+# ~never filled for salary/taxes/loans/utilities. The item sets are LEARNED per base
+# at fit time (see _compute_year_item_sets) and persisted in parameters.json.
+YEAR_BEARING_THRESHOLD = 0.98   # item with >98% non-empty years => requires a year
+YEAR_LESS_THRESHOLD = 0.02      # item with <2% non-empty years  => must have empty year
+# Rule (b): fill empty year of year-bearing items with document_year. Helps bases where
+# harvest year ≈ document year (measured ~0.98 on kolos); neutral/insufficient where the
+# harvest year drifts from the document year (measured ~0.49 on as). OFF by default —
+# enable after per-base measurement on prod.
+FILL_EMPTY_YEAR_WITH_DOC_YEAR = False
+
 
 class CatBoostModelEmbeddings(CatBoostModel):
     """Класс модели catboost с пониманием эмбеддингов"""
@@ -62,6 +74,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "moving_type",
             "company_inn",
             "base_document_kind",
+            "base_document_operation_type",  # вид операции: сильный сигнал статьи
             "contractor_inn",
             "contractor_kind",
             "cash_flow_item_code",
@@ -717,6 +730,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
             logger.info("{} fit".format("First" if is_first else "continuous"))
             logger.info(f"Starting time: {time_start}, Shape: {df.shape}")
 
+        self._compute_year_item_sets(df)
+
         for y in self.y_columns:
             self.strict_acc[y] = {}
             if USE_DETAILED_LOG:
@@ -735,6 +750,66 @@ class CatBoostModelEmbeddings(CatBoostModel):
         # self._save_cb_model(model, column=y, item=item)
         # self._load_all_models()
         # self._load_all_models()
+
+    def _compute_year_item_sets(self, df: pd.DataFrame):
+        """Learn, per item, whether a harvest year is expected (accounting logic):
+        year is filled only for crop/production items, ~never for salary/taxes/loans/
+        utilities. Stored in parameters (persisted) for the year post-rules at predict."""
+        try:
+            items = pd.to_numeric(df["cash_flow_item_code"], errors="coerce")
+            year_str = df["year"].astype(str).str.strip()
+            filled = ~year_str.isin(["", "0", "-1", "0.0"])
+            frac = filled.groupby(items).mean()
+            self.parameters["year_less_items"] = [
+                int(i) for i in frac[frac < YEAR_LESS_THRESHOLD].index if pd.notna(i)
+            ]
+            self.parameters["year_bearing_items"] = [
+                int(i) for i in frac[frac > YEAR_BEARING_THRESHOLD].index if pd.notna(i)
+            ]
+            if USE_DETAILED_LOG:
+                logger.info(
+                    "Year rule sets: %s year-less, %s year-bearing items",
+                    len(self.parameters["year_less_items"]),
+                    len(self.parameters["year_bearing_items"]),
+                )
+        except Exception as e:  # never block fitting on this heuristic
+            logger.warning("Could not compute year item sets: %s", e)
+            self.parameters.setdefault("year_less_items", [])
+            self.parameters.setdefault("year_bearing_items", [])
+
+    def _apply_year_rules(self, X_y: pd.DataFrame) -> pd.DataFrame:
+        """Post-process predicted year using accounting logic (see _compute_year_item_sets):
+        (a) items that never carry a harvest year -> empty year;
+        (b, optional) year-bearing items left empty by the model -> document_year.
+        Routes on the PREDICTED item so the output stays internally consistent."""
+        year_less = set(self.parameters.get("year_less_items", []))
+        year_bearing = set(self.parameters.get("year_bearing_items", []))
+        if not year_less and not year_bearing:
+            return X_y
+
+        pred_item = (
+            pd.to_numeric(X_y["cash_flow_item_code"], errors="coerce")
+            .fillna(-1)
+            .astype(int)
+        )
+        # (a) items that never carry a harvest year must be empty
+        if year_less:
+            X_y.loc[pred_item.isin(year_less), "year"] = 0
+        # (b) optional: fill empty year of year-bearing items with the document year
+        if (
+            FILL_EMPTY_YEAR_WITH_DOC_YEAR
+            and year_bearing
+            and "document_year" in X_y.columns
+        ):
+            empty = (
+                pd.to_numeric(X_y["year"], errors="coerce")
+                .fillna(0)
+                .astype(int)
+                .isin([0, -1])
+            )
+            mask = pred_item.isin(year_bearing) & empty
+            X_y.loc[mask, "year"] = X_y.loc[mask, "document_year"]
+        return X_y
 
     async def fit(self, Xy_api: dict, parameters):
         X_y = pd.DataFrame(Xy_api)
@@ -1012,6 +1087,10 @@ class CatBoostModelEmbeddings(CatBoostModel):
                 if USE_DETAILED_LOG:
                     logger.info('Predicting model. Field = "{}". Done'.format(y))
                     logger.info("Predicted: %s", X_y[y])
+
+        # Accounting-logic post-rules for year (uses the predicted item)
+        X_y = self._apply_year_rules(X_y)
+
         for y in self.y_columns:
             if y != "year":
                 X_y[y] = X_y[y].astype(str).str.zfill(9)

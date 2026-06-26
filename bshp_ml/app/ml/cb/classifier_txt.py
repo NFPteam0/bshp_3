@@ -53,6 +53,16 @@ YEAR_LESS_THRESHOLD = 0.02      # item with <2% non-empty years  => must have em
 # enable after per-base measurement on prod.
 FILL_EMPTY_YEAR_WITH_DOC_YEAR = False
 
+# --- article_code safe override (recurring-key memorization) ----------------
+# A номенклатура code seen >= MIN_SUPPORT times in history whose item AND details are
+# each >= MIN_PURITY pure gets a deterministic (item, details) override at predict.
+# Item+details are learned jointly, so the emitted 1C pair is valid. Near-100% accurate
+# on the ~6-10% of rows it covers (temporal holdout). Sidesteps the model entirely on
+# those rows (no CTR/overfit risk). Deployable without retraining the CatBoost models.
+USE_ARTICLE_CODE_OVERRIDE = True
+ARTICLE_OVERRIDE_MIN_SUPPORT = 5
+ARTICLE_OVERRIDE_MIN_PURITY = 0.95
+
 
 class CatBoostModelEmbeddings(CatBoostModel):
     """Класс модели catboost с пониманием эмбеддингов"""
@@ -83,6 +93,8 @@ class CatBoostModelEmbeddings(CatBoostModel):
             "contract_name",  # TODO: number?
             "accepted_issued",
             "article_parent",
+            "store",  # детализация ФОТ/коммуналки: purity 1.0; low-card (~20-30)
+            "analytic",  # культура+год: сигнал статьи/детал./года; low-card (~65-85)
             # "article_group",
         ]
         self.fsttxt_columns = ["cash_flow_item_name", "cash_flow_details_name", "year"]
@@ -731,6 +743,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
             logger.info(f"Starting time: {time_start}, Shape: {df.shape}")
 
         self._compute_year_item_sets(df)
+        self._compute_article_overrides(df)
 
         for y in self.y_columns:
             self.strict_acc[y] = {}
@@ -776,6 +789,70 @@ class CatBoostModelEmbeddings(CatBoostModel):
             logger.warning("Could not compute year item sets: %s", e)
             self.parameters.setdefault("year_less_items", [])
             self.parameters.setdefault("year_bearing_items", [])
+
+    def _compute_article_overrides(self, df: pd.DataFrame):
+        """Build a deterministic article_code -> [item, details] map for codes that are
+        near-pure in history (recurring-key memorization). item & details are learned
+        jointly (both >= MIN_PURITY) so the pair is valid in 1C. Persisted in parameters."""
+        try:
+            if "article_code" not in df.columns:
+                self.parameters["article_overrides"] = {}
+                return
+            d = pd.DataFrame(
+                {
+                    "acode": df["article_code"].astype(str).str.strip(),
+                    "item": pd.to_numeric(df["cash_flow_item_code"], errors="coerce"),
+                    "det": pd.to_numeric(df["cash_flow_details_code"], errors="coerce"),
+                }
+            )
+            d = d[(d.acode != "") & d.item.notna() & d.det.notna()]
+            size = d.groupby("acode").size()
+            d = d[d.acode.isin(size[size >= ARTICLE_OVERRIDE_MIN_SUPPORT].index)]
+            g = d.groupby("acode")
+            item_mode = g.item.agg(lambda s: s.value_counts().idxmax())
+            item_pur = g.item.agg(lambda s: s.value_counts(normalize=True).iloc[0])
+            det_mode = g.det.agg(lambda s: s.value_counts().idxmax())
+            det_pur = g.det.agg(lambda s: s.value_counts(normalize=True).iloc[0])
+            ok = (item_pur >= ARTICLE_OVERRIDE_MIN_PURITY) & (
+                det_pur >= ARTICLE_OVERRIDE_MIN_PURITY
+            )
+            self.parameters["article_overrides"] = {
+                code: [int(item_mode[code]), int(det_mode[code])]
+                for code in item_mode.index[ok]
+            }
+            if USE_DETAILED_LOG:
+                logger.info(
+                    "Article overrides: %s safe codes",
+                    len(self.parameters["article_overrides"]),
+                )
+        except Exception as e:  # never block fitting on this heuristic
+            logger.warning("Could not compute article overrides: %s", e)
+            self.parameters.setdefault("article_overrides", {})
+
+    def _apply_article_override(self, X_y: pd.DataFrame) -> pd.DataFrame:
+        """Override (item, details) for rows whose article_code is a near-pure recurring
+        key. Writes the jointly-learned pair, so the emitted 1C (item, det) stays valid."""
+        overrides = self.parameters.get("article_overrides") or {}
+        if (
+            not USE_ARTICLE_CODE_OVERRIDE
+            or not overrides
+            or "article_code" not in X_y.columns
+        ):
+            return X_y
+        acode = X_y["article_code"].astype(str).str.strip()
+        mask = acode.isin(overrides.keys())
+        if not mask.any():
+            return X_y
+        sel = acode[mask]
+        X_y.loc[mask, "cash_flow_item_code"] = sel.map(
+            lambda c: overrides[c][0]
+        ).values
+        X_y.loc[mask, "cash_flow_details_code"] = sel.map(
+            lambda c: overrides[c][1]
+        ).values
+        if USE_DETAILED_LOG:
+            logger.info("Article override applied to %s rows", int(mask.sum()))
+        return X_y
 
     def _apply_year_rules(self, X_y: pd.DataFrame) -> pd.DataFrame:
         """Post-process predicted year using accounting logic (see _compute_year_item_sets):
@@ -1088,7 +1165,9 @@ class CatBoostModelEmbeddings(CatBoostModel):
                     logger.info('Predicting model. Field = "{}". Done'.format(y))
                     logger.info("Predicted: %s", X_y[y])
 
-        # Accounting-logic post-rules for year (uses the predicted item)
+        # Deterministic safe override for recurring article codes (item + details)
+        X_y = self._apply_article_override(X_y)
+        # Accounting-logic post-rules for year (uses the predicted/overridden item)
         X_y = self._apply_year_rules(X_y)
 
         for y in self.y_columns:

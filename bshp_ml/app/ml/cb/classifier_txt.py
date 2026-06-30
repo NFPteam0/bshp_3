@@ -45,8 +45,8 @@ TEST_FRAC = 0.15
 # Harvest year ("год урожая") is meaningful only for crop/production items and is
 # ~never filled for salary/taxes/loans/utilities. The item sets are LEARNED per base
 # at fit time (see _compute_year_item_sets) and persisted in parameters.json.
-YEAR_BEARING_THRESHOLD = 0.98   # item with >98% non-empty years => requires a year
-YEAR_LESS_THRESHOLD = 0.02      # item with <2% non-empty years  => must have empty year
+YEAR_BEARING_THRESHOLD = 0.98  # item with >98% non-empty years => requires a year
+YEAR_LESS_THRESHOLD = 0.02  # item with <2% non-empty years  => must have empty year
 # Rule (b): fill empty year of year-bearing items with document_year. Helps bases where
 # harvest year ≈ document year (measured ~0.98 on kolos); neutral/insufficient where the
 # harvest year drifts from the document year (measured ~0.49 on as). OFF by default —
@@ -332,6 +332,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
                         best_score = acc
 
                         best_params = params
+                        best_model = current_model
                         if USE_DETAILED_LOG:
                             logger.info(
                                 f"*** New best model! Test Accuracy: {acc:.4f} ***, ***train accuracy: {tacc:.4f}*** Best params: {best_params}"
@@ -352,27 +353,27 @@ class CatBoostModelEmbeddings(CatBoostModel):
                                 f"Baseline shape: {test_pool.get_baseline().shape if test_pool.get_baseline() is not None else None}"
                             )
 
-                        if _df_latest is not None and len(_df_latest) > 0:
-                            final_batch = pd.concat(
-                                [df_test, _df_latest], ignore_index=True
-                            )
-                        else:
-                            final_batch = df_test
+                        # if _df_latest is not None and len(_df_latest) > 0:
+                        #     final_batch = pd.concat(
+                        #         [df_test, _df_latest], ignore_index=True
+                        #     )
+                        # else:
+                        #     final_batch = df_test
 
-                        # Дообучить для прода
-                        _params = params.copy()
-                        _params["use_best_model"] = False
+                        # # Дообучить для прода
+                        # _params = params.copy()
+                        # _params["use_best_model"] = False
 
-                        current_model_test = CatBoostClassifier(
-                            **_params, allow_const_label=True
-                        )
-                        current_model_test = current_model_test.fit(
-                            X=final_batch.drop(y, axis=1),
-                            y=final_batch[y],
-                            init_model=current_model,
-                            cat_features=cat_idxs,
-                        )
-                        best_model = current_model_test
+                        # current_model_test = CatBoostClassifier(
+                        #     **_params, allow_const_label=True
+                        # )
+                        # current_model_test = current_model_test.fit(
+                        #     X=final_batch.drop(y, axis=1),
+                        #     y=final_batch[y],
+                        #     init_model=current_model,
+                        #     cat_features=cat_idxs,
+                        # )
+                        # best_model = current_model_test
         return best_model, best_score
 
     def train_on_field(
@@ -844,9 +845,7 @@ class CatBoostModelEmbeddings(CatBoostModel):
         if not mask.any():
             return X_y
         sel = acode[mask]
-        X_y.loc[mask, "cash_flow_item_code"] = sel.map(
-            lambda c: overrides[c][0]
-        ).values
+        X_y.loc[mask, "cash_flow_item_code"] = sel.map(lambda c: overrides[c][0]).values
         X_y.loc[mask, "cash_flow_details_code"] = sel.map(
             lambda c: overrides[c][1]
         ).values
